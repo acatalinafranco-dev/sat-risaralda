@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+# Credenciales — NUNCA commitear
+.streamlit/secrets.toml
+*credentials*.json
+*service_account*.json
+.env
+gee-key.json

@@ -1,0 +1,6 @@
+[theme]
+base = "dark"
+primaryColor = "#F7941D"  # naranja institucional UNGRD
+
+[server]
+headless = true
