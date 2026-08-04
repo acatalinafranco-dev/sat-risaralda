@@ -1,8 +1,8 @@
-"""SAT Satelital - Pajarito (Boyacá) · Página de inicio.
+"""Monitoreo Satelital de Movimientos en Masa - Pajarito (Boyacá) · Página de inicio.
 
-Sistema de Alerta Temprana basado en productos satelitales de Google Earth
-Engine para el monitoreo hidrometeorológico y de movimientos en masa en el
-municipio de Pajarito, Boyacá (piedemonte llanero).
+Monitoreo satelital de movimientos en masa basado en productos de Google
+Earth Engine (hidrometeorología y cobertura vegetal) para el municipio de
+Pajarito, Boyacá (piedemonte llanero).
 
 Ejecutar local:  streamlit run app.py
 """
@@ -11,13 +11,13 @@ from __future__ import annotations
 import streamlit as st
 
 from src.gee_session import MUNICIPIO
-from src.ui import (AZUL_UNGRD, DEPENDENCIA, ENTIDAD, NARANJA_UNGRD, _logo_html,
+from src.ui import (AZUL_UNGRD, DEPENDENCIA, ENTIDAD, NARANJA_UNGRD,
                     agregar_contorno, ajustar_al_municipio,
                     branding_institucional, conectar_gee, mapa_base,
                     pie_institucional)
 
 st.set_page_config(
-    page_title="SAT Pajarito · Boyacá",
+    page_title="Monitoreo MM · Pajarito, Boyacá",
     page_icon="🛰️",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -25,12 +25,7 @@ st.set_page_config(
 
 branding_institucional()
 
-_logo = _logo_html(300)
-if _logo:
-    st.markdown(_logo, unsafe_allow_html=True)
-    st.write("")
-
-st.title("🛰️ SAT Satelital · Pajarito, Boyacá")
+st.title("🛰️ Monitoreo Satelital Movimientos en Masa · Pajarito, Boyacá")
 st.markdown(
     f"<div style='font-size:1.05rem; font-weight:600; color:{NARANJA_UNGRD}; "
     f"margin-top:-8px;'>{DEPENDENCIA}</div>"
@@ -42,7 +37,7 @@ st.markdown(
 )
 st.markdown(
     f"""
-Sistema de Alerta Temprana **satelital** para el municipio de
+**Monitoreo satelital de movimientos en masa** para el municipio de
 **{MUNICIPIO['nombre']} ({MUNICIPIO['departamento']})** — código DANE
 `{MUNICIPIO['codigo_dane']}`, ~{MUNICIPIO['area_km2']:.0f} km², cabecera a
 {MUNICIPIO['altitud_cabecera_m']} m s.n.m. en el piedemonte llanero, sobre la
@@ -112,7 +107,7 @@ st.markdown(
 )
 
 st.caption(
-    "SAT Satelital Pajarito · datos calculados en vivo desde Google Earth Engine "
+    "Monitoreo Satelital de Movimientos en Masa · Pajarito · datos calculados en vivo desde Google Earth "
     "sobre el polígono municipal DIVIPOLA (DANE)."
 )
 

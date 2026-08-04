@@ -4,3 +4,4 @@ leafmap>=0.36
 folium>=0.16
 plotly>=5.22
 pandas>=2.2
+Pillow>=10.0

@@ -1,6 +1,6 @@
-# 🛰️ SAT Satelital · Pajarito, Boyacá
+# 🛰️ Monitoreo Satelital de Movimientos en Masa · Pajarito, Boyacá
 
-Sistema de Alerta Temprana **100 % satelital** para el municipio de Pajarito
+Sistema de monitoreo **100 % satelital** para el municipio de Pajarito
 (Boyacá, código DANE 15518), en el piedemonte llanero. Monitorea precipitación
 y cobertura vegetal en vivo desde **Google Earth Engine (GEE)** sobre el
 polígono oficial del municipio (DIVIPOLA), con foco en la detección temprana

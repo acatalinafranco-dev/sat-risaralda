@@ -6,6 +6,7 @@ descargo de responsabilidad en el marco de la Ley 1523 de 2012).
 from __future__ import annotations
 
 import base64
+import io
 from functools import lru_cache
 from pathlib import Path
 
@@ -26,11 +27,40 @@ DEPENDENCIA = "Subdirección para el Conocimiento del Riesgo"
 ENTIDAD = "Unidad Nacional para la Gestión del Riesgo de Desastres"
 CONTACTO = "jorge.alpala@gestiondelriesgo.gov.co"
 CITA = (
-    "Alpala, J. A. (2026). SAT Satelital Pajarito (Boyacá): monitoreo "
-    "hidrometeorológico y de movimientos en masa con Google Earth Engine. "
+    "Alpala, J. A. (2026). Monitoreo Satelital de Movimientos en Masa, "
+    "Pajarito (Boyacá): seguimiento hidrometeorológico y de cobertura "
+    "vegetal con Google Earth Engine. "
     "Subdirección para el Conocimiento del Riesgo, Unidad Nacional para la "
     "Gestión del Riesgo de Desastres (UNGRD). Aplicación web Streamlit."
 )
+
+
+
+@lru_cache(maxsize=1)
+def _logo_fondo_blanco() -> bytes | None:
+    """Devuelve el logo compuesto sobre fondo blanco (PNG en bytes).
+
+    El logo institucional tiene fondo transparente y texto oscuro; sobre el
+    tema oscuro de Streamlit el texto se pierde. Aquí se aplana sobre blanco
+    para que st.logo lo muestre nítido. Si Pillow no está o falla, devuelve
+    el PNG original.
+    """
+    if not RUTA_LOGO.exists():
+        return None
+    try:
+        from PIL import Image
+
+        img = Image.open(RUTA_LOGO).convert("RGBA")
+        fondo = Image.new("RGBA", img.size, (255, 255, 255, 255))
+        fondo.paste(img, (0, 0), img)
+        buf = io.BytesIO()
+        fondo.convert("RGB").save(buf, format="PNG")
+        return buf.getvalue()
+    except Exception:
+        try:
+            return RUTA_LOGO.read_bytes()
+        except Exception:
+            return None
 
 
 @lru_cache(maxsize=1)
@@ -55,18 +85,29 @@ def _logo_html(ancho: int = 240) -> str | None:
 
 
 def branding_institucional() -> None:
-    """Logo y dependencia en la barra lateral. Llamar en cada página."""
-    html = _logo_html(210)
+    """Logo institucional (fondo blanco) fijo arriba de la barra lateral.
+
+    Usa la API nativa st.logo, que ancla el logo por encima de la navegación
+    de páginas SIN CSS. El logo se aplana sobre blanco para ser legible en el
+    tema oscuro. La leyenda de dependencia/entidad va debajo, en el sidebar.
+    Idempotente: seguro de llamar en cada página.
+    """
+    datos = _logo_fondo_blanco()
+    if datos:
+        # st.logo necesita ruta o URL; guardamos el PNG compuesto una vez.
+        ruta_tmp = RUTA_LOGO.parent / "_ungrd_blanco.png"
+        try:
+            if not ruta_tmp.exists():
+                ruta_tmp.write_bytes(datos)
+            st.logo(str(ruta_tmp), size="large")
+        except Exception:
+            pass
+
     with st.sidebar:
-        if html:
-            st.markdown(html, unsafe_allow_html=True)
         st.markdown(
-            f"<div style='font-size:0.78rem; color:#c9c9c9; margin-top:6px; "
-            f"line-height:1.35;'>{DEPENDENCIA}<br>"
-            f"<span style='color:#9a9a9a;'>{ENTIDAD}</span></div>",
-            unsafe_allow_html=True,
-        )
-        st.markdown(
+            f"<div style='font-size:0.78rem; color:#c9c9c9; margin-top:4px; "
+            f"line-height:1.35;'><b>{DEPENDENCIA}</b><br>"
+            f"<span style='color:#9a9a9a;'>{ENTIDAD}</span></div>"
             f"<hr style='border:none; height:3px; margin:8px 0 4px 0; "
             f"background:linear-gradient(to right, {AZUL_UNGRD}, {NARANJA_UNGRD});'>",
             unsafe_allow_html=True,
@@ -84,7 +125,7 @@ def pie_institucional() -> None:
         f"""
 <div style='font-size:0.8rem; color:#b8b8b8; line-height:1.5;'>
 <b style='color:{NARANJA_UNGRD};'>⚠️ Descargo de responsabilidad.</b>
-Este es un <b>SAT satelital de apoyo</b> al conocimiento y monitoreo del
+Este es un <b>sistema de monitoreo satelital de apoyo</b> al conocimiento del
 riesgo. En el marco de la <b>Ley 1523 de 2012</b> (Política Nacional de
 Gestión del Riesgo de Desastres), <b>no sustituye</b> los sistemas de alerta
 temprana físicos/instrumentales ni comunitarios, ni los protocolos y
