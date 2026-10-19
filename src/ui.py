@@ -94,7 +94,7 @@ def branding_institucional() -> None:
     datos = _logo_fondo_blanco()
     if datos:
         # st.logo necesita ruta o URL; guardamos el PNG compuesto una vez.
-        ruta_tmp = RUTA_LOGO.parent / "_ungrd_blanco.png"
+        ruta_tmp = RUTA_LOGO.parent / "_carder_blanco.png"
         try:
             if not ruta_tmp.exists():
                 ruta_tmp.write_bytes(datos)
