@@ -1,6 +1,6 @@
 """Componentes de interfaz compartidos por todas las páginas.
 
-Incluye la identidad institucional de la UNGRD (logo, colores y pie con el
+Incluye la identidad institucional de la CARDER (logo, colores y pie con el
 descargo de responsabilidad en el marco de la Ley 1523 de 2012).
 """
 from __future__ import annotations
@@ -16,22 +16,21 @@ import streamlit as st
 
 from .gee_session import MUNICIPIO, bounds_municipio, geojson_municipio, init_ee
 
-# ---- Identidad institucional UNGRD -----------------------------------------
-# Colores aproximados del manual de identidad (ajustables aquí en un solo lugar)
-AZUL_UNGRD = "#003087"
-NARANJA_UNGRD = "#F7941D"
-AMARILLO_UNGRD = "#FFC72C"
+# ---- Identidad institucional CARDER ----------------------------------------
+# Los nombres de las variables de color se conservan para no romper las páginas.
+AZUL_UNGRD = "#004B87"      # azul institucional CARDER
+NARANJA_UNGRD = "#008A4B"   # verde institucional CARDER (color de acento)
+AMARILLO_UNGRD = "#FFCC00"  # amarillo CARDER
 
-RUTA_LOGO = Path(__file__).resolve().parent.parent / "logo" / "ungrd-horizontal.png"
-DEPENDENCIA = "Subdirección para el Conocimiento del Riesgo"
-ENTIDAD = "Unidad Nacional para la Gestión del Riesgo de Desastres"
-CONTACTO = "jorge.alpala@gestiondelriesgo.gov.co"
+RUTA_LOGO = Path(__file__).resolve().parent.parent / "logo" / "carder-logo.png"
+DEPENDENCIA = "Subdirección para el Conocimiento y la Reducción del Riesgo - SCORE"
+ENTIDAD = "Corporación Autónoma Regional de Risaralda - CARDER"
+CONTACTO = "correo@carder.gov.co"  # ← escriba aquí su correo de contacto
 CITA = (
-    "Alpala, J. A. (2026). Monitoreo Satelital de Movimientos en Masa, "
-    "Pajarito (Boyacá): seguimiento hidrometeorológico y de cobertura "
-    "vegetal con Google Earth Engine. "
-    "Subdirección para el Conocimiento del Riesgo, Unidad Nacional para la "
-    "Gestión del Riesgo de Desastres (UNGRD). Aplicación web Streamlit."
+    "Corporación Autónoma Regional de Risaralda - CARDER (2026). Monitoreo "
+    "Satelital de Movimientos en Masa, Risaralda: seguimiento "
+    "hidrometeorológico y de cobertura vegetal con Google Earth Engine. "
+    "Subdirección para el Conocimiento y la Reducción del Riesgo - SCORE. "
 )
 
 
