@@ -19,17 +19,17 @@ import ee
 import streamlit as st
 
 DIR_DATA = Path(__file__).resolve().parent.parent / "data"
-RUTA_GEOJSON = DIR_DATA / "pajarito.geojson"
+RUTA_GEOJSON = DIR_DATA / "risaralda.geojson"
 
-# Datos del municipio (DIVIPOLA / DANE)
+# Datos del departamento (DIVIPOLA / DANE)
 MUNICIPIO = {
-    "codigo_dane": "15518",
-    "nombre": "Pajarito",
-    "departamento": "Boyacá",
-    "lat": 5.3823,
-    "lon": -72.6967,
-    "area_km2": 313.0,
-    "altitud_cabecera_m": 793,
+    "codigo_dane": "66",
+    "nombre": "Risaralda",
+    "departamento": "Risaralda",
+    "lat": 5.05,
+    "lon": -75.95,
+    "area_km2": 3600.0,
+    "altitud_cabecera_m": 1411,
 }
 
 
