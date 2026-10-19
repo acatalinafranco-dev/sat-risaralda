@@ -1,4 +1,4 @@
-"""Precipitación satelital sobre el municipio de Pajarito (Boyacá).
+"""Precipitación satelital sobre el departamento de Risaralda.
 
 Fuentes (Google Earth Engine, cálculo en vivo):
   - IMERG V07 (NASA GPM)      ~11 km, media hora  -> latencia ~1-2 días
