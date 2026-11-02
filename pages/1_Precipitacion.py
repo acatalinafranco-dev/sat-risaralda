@@ -1,7 +1,7 @@
 """Página: Precipitación · series, mapas interpolados y climatología.
 
 Dashboard automático (sin botón): al cargar calcula en vivo desde GEE la
-precipitación media sobre el polígono de Pajarito con IMERG, CHIRPS y
+precipitación media sobre el polígono seleccionado (Risaralda o un municipio) con IMERG, CHIRPS y
 ERA5-Land, más la climatología CHIRPS de 20 años. Resultados en caché.
 """
 from __future__ import annotations
@@ -16,16 +16,16 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from src import gee_precipitacion as gp
-from src.ui import (COLOR_FUENTE, MESES_ES, NOMBRE_FUENTE, agregar_contorno,
+from src.ui import (cache_mun, COLOR_FUENTE, MESES_ES, NOMBRE_FUENTE, agregar_contorno,
                     ajustar_al_municipio, conectar_gee, encabezado,
                     leyenda_continua, mapa_base, pie_institucional)
 
-st.set_page_config(page_title="Precipitación · SAT Pajarito", layout="wide",
+st.set_page_config(page_title="Precipitación · SAT Risaralda", layout="wide",
                    page_icon="🌧️", initial_sidebar_state="expanded")
 
 encabezado(
-    "🌧️ Precipitación · Pajarito, Boyacá",
-    "Lluvia media sobre el **polígono municipal**, calculada en vivo desde "
+    "🌧️ Precipitación · {mun}",
+    "Lluvia media sobre el **polígono seleccionado**, calculada en vivo desde "
     "Google Earth Engine con **IMERG (NASA)**, **CHIRPS (UCSB)** y "
     "**ERA5-Land (ECMWF)**.",
 )
@@ -47,27 +47,27 @@ if not conectar_gee():
 HOY = dt.date.today().isoformat()
 
 
-@st.cache_data(ttl=3600, show_spinner=False)
+@cache_mun(ttl=3600)
 def _serie(fuente: str, dias: int, fecha_consulta: str):
     return gp.serie_diaria(fuente, dias)
 
 
-@st.cache_data(ttl=3600, show_spinner=False)
+@cache_mun(ttl=3600)
 def _mapa(fuente: str, dias: int, fecha_consulta: str):
     return gp.mapa_acumulado(fuente, dias)
 
 
-@st.cache_data(ttl=3600, show_spinner=False)
+@cache_mun(ttl=3600)
 def _grilla(fuente: str, modo: str, fecha_consulta: str):
     return gp.grilla_acumulados(fuente, modo)
 
 
-@st.cache_data(ttl=86400, show_spinner=False)
+@cache_mun(ttl=86400)
 def _clim(anios: int, fecha_consulta: str):
     return gp.climatologia_chirps(anios)
 
 
-@st.cache_data(ttl=86400, show_spinner=False)
+@cache_mun(ttl=86400)
 def _mapa_clim(anios: int, fecha_consulta: str):
     return gp.mapa_media_anual_chirps(anios)
 
@@ -144,7 +144,7 @@ st.caption(
     "IMERG ~2 días, ERA5 ~6 días, CHIRPS ~2-3 semanas."
 )
 st.info(
-    "**ERA5-Land en el piedemonte llanero:** tiende a sobreestimar la lluvia "
+    "**ERA5-Land en zona andina:** tiende a sobreestimar la lluvia "
     "orográfica casi a diario. Úselo para patrones temporales; para valores "
     "absolutos prefiera CHIRPS e IMERG.",
     icon="⛰️",
@@ -176,7 +176,7 @@ st.caption(
     "Suma semanal (semanas calendario lunes-domingo) de la serie diaria. La "
     "primera y última semana pueden estar incompletas. Semanas consecutivas "
     "muy lluviosas saturan el suelo: es el precursor típico de movimientos "
-    "en masa en el piedemonte."
+    "en masa en zonas de ladera."
 )
 
 st.markdown("### Acumulado mensual por fuente")
@@ -211,8 +211,8 @@ st.markdown("### Mapas de lluvia acumulada por período")
 st.caption(
     "Grilla de 8 submapas con **escala de color común** (comparables entre "
     "sí). IMERG y ERA5 tienen píxeles de ~11 km, CHIRPS de ~5.5 km: el campo "
-    "se interpola bilinealmente sobre un buffer de 10 km alrededor del "
-    "municipio. Los períodos terminan en la última fecha con datos de la "
+    "se interpola bilinealmente sobre un buffer de 15 km alrededor del "
+    "polígono. Los períodos terminan en la última fecha con datos de la "
     "fuente (según su latencia); los meses son calendario completos."
 )
 
@@ -262,7 +262,7 @@ else:
                              is not None else "s/d")
                 st.markdown(
                     f"<div style='text-align:center; margin-top:-0.6rem;'>"
-                    f"<b>{pdef['etiqueta']}</b> · media mpio: {media_txt}</div>",
+                    f"<b>{pdef['etiqueta']}</b> · media zonal: {media_txt}</div>",
                     unsafe_allow_html=True,
                 )
     st.write("")
@@ -295,7 +295,7 @@ with cc1:
                             title=f"Promedio mensual {clim['periodo']}",
                             margin=dict(t=40, b=40, l=50, r=20))
         st.plotly_chart(fig_c, use_container_width=True)
-        st.metric("Precipitación media anual del municipio",
+        st.metric("Precipitación media anual (polígono seleccionado)",
                   f"{clim['anual_mm']:,.0f} mm/año")
         st.caption(
             "La estacionalidad marca las ventanas críticas del SAT: los meses "
@@ -322,7 +322,7 @@ with cc2:
 
 st.divider()
 st.caption(
-    "Media zonal sobre el polígono municipal DIVIPOLA. Fuentes: NASA GPM IMERG "
+    "Media zonal sobre el polígono seleccionado DIVIPOLA. Fuentes: NASA GPM IMERG "
     "V07 · UCSB CHIRPS Daily/Pentad · ECMWF ERA5-Land. Próxima iteración: "
     "integración de estaciones IDEAM (red terrestre)."
 )
