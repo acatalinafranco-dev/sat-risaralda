@@ -114,7 +114,7 @@ st.caption(
     "Compara un período de **referencia** con uno **reciente**. Las zonas en "
     "magenta perdieron vegetación densa de forma severa: revíselas contra la "
     "imagen en color real de la página *Imágenes satelitales* antes de emitir "
-    "cualquier alerta."
+    "cualquier decisión."
 )
 
 cc1, cc2, cc3 = st.columns(3)
