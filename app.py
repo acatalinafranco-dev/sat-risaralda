@@ -30,7 +30,7 @@ st.set_page_config(
 
 branding_institucional()
 
-st.title("🛰️ Monitoreo Satelital Movimientos en Masa · Risaralda")
+st.title("🛰️ Monitoreo Satelital de Movimientos en Masa · Risaralda")
 st.markdown(
     f"<div style='font-size:1.05rem; font-weight:600; color:{VERDE_CARDER}; "
     f"margin-top:-8px;'>{DEPENDENCIA}</div>"
