@@ -1,10 +1,10 @@
 """Página: Índices de vegetación · monitoreo de movimientos en masa.
 
-  1. Mapa del índice actual (NDVI / NDMI / BSI) sobre el municipio.
+  1. Mapa del índice actual (NDVI / NDMI / BSI) sobre el polígono seleccionado.
   2. Detección de cambios ΔNDVI (referencia vs. período reciente): la pérdida
      abrupta de vegetación en laderas es indicador de cicatrices de
      deslizamiento, remoción de cobertura o intervención antrópica.
-  3. Serie temporal mensual del NDVI medio municipal.
+  3. Serie temporal mensual del NDVI medio.
 """
 from __future__ import annotations
 
@@ -18,14 +18,14 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from src import gee_indices as gx
-from src.ui import (agregar_contorno, ajustar_al_municipio, conectar_gee,
+from src.ui import (cache_mun, agregar_contorno, ajustar_al_municipio, conectar_gee,
                     encabezado, leyenda_continua, mapa_base, pie_institucional)
 
-st.set_page_config(page_title="Vegetación · SAT Pajarito", layout="wide",
+st.set_page_config(page_title="Vegetación · SAT Risaralda", layout="wide",
                    page_icon="🌿", initial_sidebar_state="expanded")
 
 encabezado(
-    "🌿 Índices de vegetación · Pajarito, Boyacá",
+    "🌿 Índices de vegetación · {mun}",
     "Monitoreo de la cobertura vegetal con Sentinel-2 (máscara de nubes "
     "Cloud Score+) para la **detección temprana de movimientos en masa**: "
     "pérdidas abruptas de NDVI en ladera son la firma óptica típica de un "
@@ -37,17 +37,17 @@ if not conectar_gee():
 
 
 # Las excepciones no se cachean: un error transitorio no queda pegado.
-@st.cache_data(ttl=3600, show_spinner=False)
+@cache_mun(ttl=3600)
 def _mapa_indice(indice, f0, f1):
     return gx.mapa_indice(indice, f0, f1)
 
 
-@st.cache_data(ttl=3600, show_spinner=False)
+@cache_mun(ttl=3600)
 def _cambio(r0, r1, a0, a1, umbral):
     return gx.mapa_cambio_ndvi(r0, r1, a0, a1, umbral)
 
 
-@st.cache_data(ttl=86400, show_spinner=False)
+@cache_mun(ttl=86400)
 def _serie_ndvi(meses, fecha_consulta):
     return gx.serie_ndvi_mensual(meses)
 
@@ -99,7 +99,7 @@ else:
     m.to_streamlit(height=520)
 
     k1, k2, k3 = st.columns(3)
-    k1.metric(f"{indice} medio (municipio)", f"{res['media']:.3f}")
+    k1.metric(f"{indice} medio (polígono)", f"{res['media']:.3f}")
     k2.metric("Mínimo", f"{res['min']:.3f}")
     k3.metric("Máximo", f"{res['max']:.3f}")
     leyenda_continua(f"{indice} · {ventana.lower()}", res["vis"])
@@ -155,7 +155,7 @@ else:
     m2.to_streamlit(height=520)
 
     st.metric(
-        "Área con pérdida severa de vegetación (dentro del municipio)",
+        "Área con pérdida severa de vegetación (dentro del polígono)",
         f"{cambio['area_perdida_ha']:,.1f} ha",
         help=f"Píxeles con ΔNDVI < {umbral} que antes tenían NDVI > 0.4",
     )
@@ -166,7 +166,7 @@ else:
 # 3) Serie temporal NDVI
 # --------------------------------------------------------------------------
 st.divider()
-st.markdown("### Serie temporal · NDVI medio del municipio")
+st.markdown("### Serie temporal · NDVI medio del polígono seleccionado")
 
 meses = st.select_slider("Meses hacia atrás", options=[12, 18, 24, 36], value=24)
 
@@ -188,11 +188,11 @@ else:
     fig.add_hline(y=media, line_dash="dash", line_color="#888",
                   annotation_text=f"media {media:.2f}")
     fig.update_layout(height=360, xaxis_title="Mes",
-                      yaxis_title="NDVI medio municipal",
+                      yaxis_title="NDVI medio",
                       margin=dict(t=30, b=40, l=50, r=20))
     st.plotly_chart(fig, use_container_width=True)
     st.caption(
-        "Caídas sostenidas del NDVI municipal (fuera de la estacionalidad "
+        "Caídas sostenidas del NDVI (fuera de la estacionalidad "
         "normal) ameritan revisión con ΔNDVI e imágenes en color real. "
         "Meses muy nubosos pueden quedar sin dato."
     )
