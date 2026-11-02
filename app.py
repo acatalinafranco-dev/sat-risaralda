@@ -29,7 +29,7 @@ st.title("🛰️ Monitoreo Satelital Movimientos en Masa · Pajarito, Boyacá")
 st.markdown(
     f"<div style='font-size:1.05rem; font-weight:600; color:{NARANJA_UNGRD}; "
     f"margin-top:-8px;'>{DEPENDENCIA}</div>"
-    f"<div style='font-size:0.92rem; color:#c9c9c9; margin-top:2px;'>"
+    f"<div style='font-size:0.92rem; color:#3a3a3a; margin-top:2px;'>"
     f"{ENTIDAD}</div>"
     f"<hr style='border:none; height:4px; margin:10px 0 14px 0; width:340px; "
     f"background:linear-gradient(to right, {AZUL_UNGRD}, {NARANJA_UNGRD});'>",
