@@ -62,7 +62,7 @@ conectado = conectar_gee()
 
 
 @st.cache_data(ttl=21600, show_spinner=False)
-def _comparativo(fecha_consulta: str):
+def _comparativo_v2(fecha_consulta: str):
     return tabla_comparativa()
 
 
@@ -71,7 +71,7 @@ if conectado:
     with st.spinner("Calculando el nivel de atención de los 14 municipios "
                     "(la primera carga del día puede tardar unos minutos)..."):
         try:
-            res = _comparativo(dt.date.today().isoformat())
+            res = _comparativo_v2(dt.date.today().isoformat())
         except Exception as exc:  # noqa: BLE001
             res = {"filas": [], "errores": [str(exc)]}
 
