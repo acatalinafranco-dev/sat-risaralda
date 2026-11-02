@@ -1,7 +1,7 @@
 """Inicialización de Google Earth Engine y geometría de análisis (Risaralda).
 
 Soporta tres modos de autenticación (en orden de prioridad):
-  1. st.secrets["gee_service_account"]  -> despliegue en Streamlit Cloud
+  1. st.secrets["gee_json"] o st.secrets["gee_service_account"]  -> Streamlit Cloud
   2. Variable de entorno GEE_CREDENTIALS_JSON (ruta a un JSON de service account)
   3. Credenciales locales de `earthengine authenticate` (desarrollo local)
 
@@ -50,8 +50,13 @@ def init_ee() -> bool:
 
     # 1) Service account desde st.secrets (Streamlit Cloud)
     try:
-        if "gee_service_account" in st.secrets:
+        info = None
+        if "gee_json" in st.secrets:
+            # Contenido completo del archivo JSON pegado entre comillas triples.
+            info = json.loads(st.secrets["gee_json"])
+        elif "gee_service_account" in st.secrets:
             info = dict(st.secrets["gee_service_account"])
+        if info:
             creds = ee.ServiceAccountCredentials(
                 info["client_email"], key_data=json.dumps(info)
             )
