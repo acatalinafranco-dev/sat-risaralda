@@ -25,7 +25,7 @@ AMARILLO_UNGRD = "#FFCC00"  # amarillo CARDER
 RUTA_LOGO = Path(__file__).resolve().parent.parent / "logo" / "carder-logo.png"
 DEPENDENCIA = "Subdirección para el Conocimiento y la Reducción del Riesgo - SCORE"
 ENTIDAD = "Corporación Autónoma Regional de Risaralda - CARDER"
-CONTACTO = "correo@carder.gov.co"  # ← escriba aquí su correo de contacto
+CONTACTO = "agalindo@carder.gov.co"  # ← escriba aquí su correo de contacto
 CITA = (
     "Corporación Autónoma Regional de Risaralda - CARDER (2026). Monitoreo "
     "Satelital de Movimientos en Masa, Risaralda: seguimiento "
@@ -104,9 +104,9 @@ def branding_institucional() -> None:
 
     with st.sidebar:
         st.markdown(
-            f"<div style='font-size:0.78rem; color:#c9c9c9; margin-top:4px; "
+            f"<div style='font-size:0.78rem; color:#3a3a3a; margin-top:4px; "
             f"line-height:1.35;'><b>{DEPENDENCIA}</b><br>"
-            f"<span style='color:#9a9a9a;'>{ENTIDAD}</span></div>"
+            f"<span style='color:#666666;'>{ENTIDAD}</span></div>"
             f"<hr style='border:none; height:3px; margin:8px 0 4px 0; "
             f"background:linear-gradient(to right, {AZUL_UNGRD}, {NARANJA_UNGRD});'>",
             unsafe_allow_html=True,
@@ -122,7 +122,7 @@ def pie_institucional() -> None:
     )
     st.markdown(
         f"""
-<div style='font-size:0.8rem; color:#b8b8b8; line-height:1.5;'>
+<div style='font-size:0.8rem; color:#3a3a3a; line-height:1.5;'>
 <b style='color:{NARANJA_UNGRD};'>⚠️ Descargo de responsabilidad.</b>
 Este es un <b>sistema de monitoreo satelital de apoyo</b> al conocimiento del
 riesgo. En el marco de la <b>Ley 1523 de 2012</b> (Política Nacional de
@@ -209,7 +209,7 @@ def mapa_base(zoom: int = 12, basemap: str = "Esri.WorldImagery") -> leafmap.Map
     return m
 
 
-def agregar_contorno(m: leafmap.Map, nombre: str = "Límite Pajarito") -> None:
+def agregar_contorno(m: leafmap.Map, nombre: str = "Límite Risaralda") -> None:
     folium.GeoJson(
         geojson_municipio(),
         name=nombre,
