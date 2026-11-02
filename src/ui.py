@@ -32,7 +32,7 @@ AMARILLO_UNGRD = AMARILLO_CARDER
 RUTA_LOGO = Path(__file__).resolve().parent.parent / "logo" / "carder-logo.png"
 DEPENDENCIA = "Subdirección para el Conocimiento y la Reducción del Riesgo - SCORE"
 ENTIDAD = "Corporación Autónoma Regional de Risaralda - CARDER"
-CONTACTO = "correo@carder.gov.co"  # ← escriba aquí el correo de contacto
+CONTACTO = "agalindo@carder.gov.co"
 CITA = (
     "Corporación Autónoma Regional de Risaralda - CARDER (2026). Monitoreo "
     "Satelital de Movimientos en Masa, Risaralda: seguimiento "
