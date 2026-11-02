@@ -1,7 +1,8 @@
 """Página: Imágenes satelitales · Sentinel-2, Landsat 8/9 y Sentinel-1.
 
 Catálogo filtrable (rango de fechas + nubosidad) de escenas disponibles sobre
-el municipio, con visualizaciones ópticas y de radar.
+el polígono seleccionado (Risaralda o un municipio), con visualizaciones
+ópticas y de radar.
 """
 from __future__ import annotations
 
@@ -16,14 +17,14 @@ import streamlit as st
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from src import gee_imagenes as gi
 from src import gibs
-from src.ui import (agregar_contorno, ajustar_al_municipio, conectar_gee,
+from src.ui import (cache_mun, agregar_contorno, ajustar_al_municipio, conectar_gee,
                     encabezado, mapa_base, pie_institucional)
 
-st.set_page_config(page_title="Satelital · SAT Pajarito", layout="wide",
+st.set_page_config(page_title="Satelital · SAT Risaralda", layout="wide",
                    page_icon="🛰️", initial_sidebar_state="expanded")
 
 encabezado(
-    "🛰️ Imágenes satelitales · Pajarito, Boyacá",
+    "🛰️ Imágenes satelitales · {mun}",
     "Catálogo de escenas **Sentinel-2**, **Landsat 8/9** y **Sentinel-1 "
     "(radar)**, más monitoreo casi en tiempo real con **GOES-Este** "
     "(cada 10 min) y **MODIS/VIIRS diario** (NASA GIBS).",
@@ -33,22 +34,22 @@ if not conectar_gee():
     st.stop()
 
 
-@st.cache_data(ttl=1800, show_spinner=False)
+@cache_mun(ttl=1800)
 def _cat_s2(f0, f1, nubes):
     return gi.escenas_s2(f0, f1, nubes)
 
 
-@st.cache_data(ttl=1800, show_spinner=False)
+@cache_mun(ttl=1800)
 def _cat_ls(f0, f1, nubes):
     return gi.escenas_landsat(f0, f1, nubes)
 
 
-@st.cache_data(ttl=1800, show_spinner=False)
+@cache_mun(ttl=1800)
 def _cat_s1(f0, f1, pol):
     return gi.escenas_s1(f0, f1, pol)
 
 
-@st.cache_data(ttl=300, show_spinner=False)  # 5 min: casi tiempo real
+@cache_mun(ttl=300)  # 5 min: casi tiempo real
 def _goes(producto, _marca_tiempo):
     return gi.goes_escena(producto)
 
@@ -59,12 +60,12 @@ def _goes_fresco(producto):
     return _goes(producto, marca)
 
 
-@st.cache_data(ttl=1800, show_spinner=False)
+@cache_mun(ttl=1800)
 def _tiles_pan(fecha, f0, f1, nubes):
     return gi.tiles_landsat_pan(fecha, f0, f1, nubes)
 
 
-@st.cache_data(ttl=1800, show_spinner=False)
+@cache_mun(ttl=1800)
 def _tiles(sensor, *args):
     if sensor == "s2":
         return gi.tiles_s2(*args)
@@ -89,7 +90,7 @@ def _pintar(res: dict, altura: int = 560):
     m.add_tile_layer(res["tiles_url"], name=f"{res['nombre']} · {res['etiqueta']}",
                      attribution="Google Earth Engine / Copernicus / USGS")
     agregar_contorno(m)
-    ajustar_al_municipio(m, margen=0.008)  # zoom ceñido al municipio
+    ajustar_al_municipio(m, margen=0.008)  # zoom ceñido a la unidad elegida
     m.to_streamlit(height=altura)
     st.caption(f"**{res['nombre']}** — {res['etiqueta']}. {res['descripcion']}")
 
@@ -124,7 +125,7 @@ if sensor == "Sentinel-2 (óptico 10 m)":
 
     if not escenas:
         st.warning("Sin escenas S2 en el rango con ese umbral de nubes. "
-                   "Amplíe fechas o suba el umbral (el piedemonte es muy nuboso).")
+                   "Amplíe fechas o suba el umbral (la zona es muy nubosa).")
     else:
         opciones = ["🧩 Compuesto mediano del rango"] + [
             f"{e['fecha']}  ·  {e['nubes']:.0f}% nubes" for e in escenas
@@ -196,7 +197,7 @@ if sensor == "Landsat 8/9 (óptico 30 m)":
 if sensor == "Sentinel-1 (radar)":
     st.caption(
         "El radar SAR **penetra nubes** y opera día y noche: es la fuente más "
-        "confiable en el piedemonte durante temporada de lluvias. Cambios "
+        "confiable en la zona andina durante temporada de lluvias. Cambios "
         "bruscos de retrodispersión entre fechas pueden indicar remoción de "
         "suelo/vegetación."
     )
@@ -235,7 +236,7 @@ if sensor == "GOES-Este (cada 10 min)":
         "El geoestacionario **GOES-Este (75°O)** es el único que observa a "
         "Colombia de forma continua: una imagen full-disk cada 10 minutos, "
         "con ~15-30 min de latencia en GEE. Ideal para vigilar la convección "
-        "que dispara los aguaceros sobre el piedemonte. Resolución ~1-2 km: "
+        "que dispara los aguaceros sobre la región. Resolución ~1-2 km: "
         "vista regional, no municipal."
     )
     producto = st.selectbox(
@@ -305,7 +306,7 @@ if sensor == "MODIS/VIIRS diario (NASA GIBS)":
         max_zoom=14,
     ).add_to(m)
     agregar_contorno(m)
-    ajustar_al_municipio(m, margen=0.008)  # zoom a nivel de municipio
+    ajustar_al_municipio(m, margen=0.008)  # zoom a la unidad elegida
     m.to_streamlit(height=560)
     st.caption(
         f"**{info['nombre']}** · resolución {info['res']} · paso "
