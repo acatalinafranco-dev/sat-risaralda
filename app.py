@@ -1,8 +1,7 @@
-"""Monitoreo Satelital de Movimientos en Masa - Pajarito (Boyacá) · Página de inicio.
+"""Monitoreo Satelital de Movimientos en Masa - Risaralda · Página de inicio.
 
 Monitoreo satelital de movimientos en masa basado en productos de Google
-Earth Engine (hidrometeorología y cobertura vegetal) para el municipio de
-Pajarito, Boyacá (piedemonte llanero).
+Earth Engine (hidrometeorología y cobertura vegetal) para el departamento de Risaralda.
 
 Ejecutar local:  streamlit run app.py
 """
@@ -37,15 +36,14 @@ st.markdown(
 )
 st.markdown(
     f"""
-**Monitoreo satelital de movimientos en masa** para el municipio de
-**{MUNICIPIO['nombre']} ({MUNICIPIO['departamento']})** — código DANE
-`{MUNICIPIO['codigo_dane']}`, ~{MUNICIPIO['area_km2']:.0f} km², cabecera a
-{MUNICIPIO['altitud_cabecera_m']} m s.n.m. en el piedemonte llanero, sobre la
-vía Sogamoso–Yopal: territorio de alta pendiente y lluvias intensas, con
-recurrencia histórica de **movimientos en masa** y crecientes súbitas.
+**Monitoreo satelital de movimientos en masa** para el departamento de
+**{MUNICIPIO['nombre']}** — código DANE `{MUNICIPIO['codigo_dane']}`,
+~{MUNICIPIO['area_km2']:.0f} km², con 14 municipios entre las cordilleras
+Occidental y Central: territorio de alta pendiente y lluvias intensas, con
+recurrencia de **movimientos en masa** y crecientes súbitas.
 
 Los datos se calculan **en vivo desde Google Earth Engine** sobre el polígono
-oficial del municipio (DIVIPOLA), sin bases de datos intermedias.
+oficial del departamento (DIVIPOLA), sin bases de datos intermedias.
 """
 )
 
@@ -107,7 +105,7 @@ st.markdown(
 )
 
 st.caption(
-    "Monitoreo Satelital de Movimientos en Masa · Pajarito · datos calculados en vivo desde Google Earth "
+    "Monitoreo Satelital de Movimientos en Masa · Risaralda · datos calculados en vivo desde Google Earth "
     "sobre el polígono municipal DIVIPOLA (DANE)."
 )
 
