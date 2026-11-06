@@ -148,9 +148,10 @@ if base is None or base.empty:
     st.stop()
 
 if len(base) > MAX_PUNTOS:
-    st.warning(f"Hay {len(base)} puntos. Se calculan los primeros {MAX_PUNTOS}; "
-               "use los filtros para acotar la selección.")
-    base = base.head(MAX_PUNTOS).reset_index(drop=True)
+    st.warning(f"Hay {len(base)} puntos. Se calcula una muestra de "
+               f"{MAX_PUNTOS} repartida al azar; use los filtros para "
+               "acotar la selección y calcular todos.")
+    base = base.sample(MAX_PUNTOS, random_state=0).sort_index().reset_index(drop=True)
 
 st.write(f"**{len(base)} puntos** listos para calcular.")
 c1, c2 = st.columns(2)
