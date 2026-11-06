@@ -22,8 +22,8 @@ st.set_page_config(page_title="Ficha municipal · SAT Risaralda", layout="wide",
 
 encabezado(
     "📄 Ficha municipal de seguimiento",
-    "Resumen de **una página** por municipio, con el nivel de atención, la "
-    "lluvia, la amenaza y los eventos del SIMMA. Pensada para reuniones del "
+    "Resumen de **una página** por municipio, con la lluvia, la "
+    "amenaza y los eventos del SIMMA. Pensada para reuniones del "
     "consejo de gestión del riesgo y para informes de seguimiento.",
 )
 
@@ -52,9 +52,8 @@ def _pdf(codigo: str) -> bytes:
     f = filas[codigo]
     a = am.loc[codigo].to_dict()
     p = pts[pts["codigo"] == codigo]
-    nivel = riesgo.nivel_atencion(f.get("pct_normal_30d"), a.get("alta_muy_alta"))
     return generar_ficha(
-        f, nivel, a, p["tipo"].value_counts().to_dict(),
+        f, a, p["tipo"].value_counts().to_dict(),
         int((p["origen"] == "Inventario").sum()))
 
 
@@ -66,14 +65,12 @@ cod = st.selectbox("Municipio", codigos, index=defecto,
 
 f = filas[cod]
 a = am.loc[cod]
-nivel = riesgo.nivel_atencion(f.get("pct_normal_30d"), a["alta_muy_alta"])
-k1, k2, k3, k4 = st.columns(4)
-k1.metric("Nivel de atención", nivel)
-k2.metric("Lluvia 30 d respecto a la normal",
+k1, k2, k3 = st.columns(3)
+k1.metric("Lluvia 30 d respecto a la normal",
           "s/d" if pd.isna(f.get("pct_normal_30d") or float("nan"))
           else f"{f['pct_normal_30d']:.0f} %")
-k3.metric("Área en amenaza alta y muy alta", f"{a['alta_muy_alta']:.0f} %")
-k4.metric("Eventos SIMMA", int((pts["codigo"] == cod).sum()))
+k2.metric("Área en amenaza alta y muy alta", f"{a['alta_muy_alta']:.0f} %")
+k3.metric("Eventos SIMMA", int((pts["codigo"] == cod).sum()))
 
 pdf = _pdf(cod)
 st.download_button(f"Descargar ficha de {nombres[cod]} (PDF)", pdf,
@@ -89,7 +86,7 @@ with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
 st.download_button("Descargar las 14 fichas (ZIP)", buf.getvalue(),
                    file_name=f"fichas_risaralda_{hoy}.zip", mime="application/zip")
 st.caption(
-    "El nivel de atención es provisional: sus umbrales deben validarse con el "
-    "SGC, el IDEAM y CARDER. La ficha no sustituye las alertas oficiales."
+    "La ficha presenta indicadores y no sustituye las alertas oficiales del "
+    "IDEAM, del SGC ni las decisiones de los consejos de gestión del riesgo."
 )
 pie_institucional()
