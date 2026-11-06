@@ -212,12 +212,25 @@ if sensor == "Sentinel-1 (radar)":
         st.warning("Sin pasadas Sentinel-1 en el rango. Amplíe las fechas "
                    "(revisita ~12 días).")
     else:
-        opciones = ["🧩 Compuesto mediano del rango"] + [
+        opciones = [
+            "🗺️ Mosaico de 12 días · órbita descendente (cobertura completa)",
+            "🗺️ Mosaico de 12 días · órbita ascendente",
+            "🧩 Compuesto mediano del rango",
+        ] + [
             f"{e['fecha']}  ·  órbita {e['orbita'].lower()}" for e in escenas
         ]
-        sel = st.selectbox(f"Pasada ({len(escenas)} disponibles)", opciones,
-                           index=1, key="s1_sel")
-        fecha = None if sel.startswith("🧩") else sel.split("·")[0].strip()
+        sel = st.selectbox(
+            f"Pasada ({len(escenas)} disponibles)", opciones, index=0,
+            key="s1_sel",
+            help="Una pasada individual cubre solo una franja del departamento. "
+                 "El mosaico une las pasadas de los últimos 12 días de una misma "
+                 "dirección de órbita para cubrir toda la zona.")
+        if sel.startswith("🗺️"):
+            fecha = "ULT:12:" + ("DESCENDING" if "descendente" in sel else "ASCENDING")
+        elif sel.startswith("🧩"):
+            fecha = None
+        else:
+            fecha = sel.split("·")[0].strip()
 
         with st.spinner("Generando radar..."):
             res = _tiles("s1", pol, fecha, f0, f1)
