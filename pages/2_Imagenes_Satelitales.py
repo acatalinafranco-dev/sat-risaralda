@@ -132,7 +132,7 @@ if sensor == "Sentinel-2 (óptico 10 m)":
             f"{e['fecha']}  ·  {e['nubes']:.0f}% nubes" for e in escenas
         ]
         sel = st.selectbox(f"Escena ({len(escenas)} disponibles)", opciones,
-                           index=0, key="s2_sel",
+                           index=2, key="s2_sel",
             help="Una escena individual puede dejar partes del departamento con "
                  "nubes. El mosaico une las tomas de los últimos 30 días y deja, "
                  "en cada píxel, el último valor sin nube.")
@@ -177,7 +177,7 @@ if sensor == "Landsat 8/9 (óptico 30 m)":
             for e in escenas
         ]
         sel = st.selectbox(f"Escena ({len(escenas)} disponibles)", opciones,
-                           index=0, key="ls_sel",
+                           index=2, key="ls_sel",
             help="Una escena individual puede dejar partes del departamento con "
                  "nubes. El mosaico une las tomas de los últimos 30 días y deja, "
                  "en cada píxel, el último valor sin nube.")
