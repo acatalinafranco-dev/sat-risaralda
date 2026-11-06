@@ -127,12 +127,21 @@ if sensor == "Sentinel-2 (óptico 10 m)":
         st.warning("Sin escenas S2 en el rango con ese umbral de nubes. "
                    "Amplíe fechas o suba el umbral (la zona es muy nubosa).")
     else:
-        opciones = ["🧩 Compuesto mediano del rango"] + [
+        opciones = ["🗺️ Mosaico de 30 días sin nubes (cobertura completa)",
+                    "🧩 Compuesto mediano del rango"] + [
             f"{e['fecha']}  ·  {e['nubes']:.0f}% nubes" for e in escenas
         ]
         sel = st.selectbox(f"Escena ({len(escenas)} disponibles)", opciones,
-                           index=1, key="s2_sel")
-        fecha = None if sel.startswith("🧩") else sel.split("·")[0].strip()
+                           index=0, key="s2_sel",
+            help="Una escena individual puede dejar partes del departamento con "
+                 "nubes. El mosaico une las tomas de los últimos 30 días y deja, "
+                 "en cada píxel, el último valor sin nube.")
+        if sel.startswith("🗺️"):
+            fecha = "ULT:30"
+        elif sel.startswith("🧩"):
+            fecha = None
+        else:
+            fecha = sel.split("·")[0].strip()
 
         with st.spinner("Generando visualización..."):
             res = _tiles("s2", vis, fecha, f0, f1, nubes)
@@ -162,13 +171,22 @@ if sensor == "Landsat 8/9 (óptico 30 m)":
         st.warning("Sin escenas Landsat en el rango con ese umbral. Landsat "
                    "revisita cada ~8 días (L8+L9): amplíe el rango de fechas.")
     else:
-        opciones = ["🧩 Compuesto mediano del rango"] + [
+        opciones = ["🗺️ Mosaico de 30 días sin nubes (cobertura completa)",
+                    "🧩 Compuesto mediano del rango"] + [
             f"{e['fecha']}  ·  {e['nubes']:.0f}% nubes  ·  {e['satelite']}"
             for e in escenas
         ]
         sel = st.selectbox(f"Escena ({len(escenas)} disponibles)", opciones,
-                           index=1, key="ls_sel")
-        fecha = None if sel.startswith("🧩") else sel.split("·")[0].strip()
+                           index=0, key="ls_sel",
+            help="Una escena individual puede dejar partes del departamento con "
+                 "nubes. El mosaico une las tomas de los últimos 30 días y deja, "
+                 "en cada píxel, el último valor sin nube.")
+        if sel.startswith("🗺️"):
+            fecha = "ULT:30"
+        elif sel.startswith("🧩"):
+            fecha = None
+        else:
+            fecha = sel.split("·")[0].strip()
 
         pan = False
         if vis == "color_real":
@@ -180,7 +198,7 @@ if sensor == "Landsat 8/9 (óptico 30 m)":
             )
 
         with st.spinner("Generando visualización..."):
-            if pan:
+            if pan and fecha != "ULT:30":
                 res = _tiles_pan(fecha, f0, f1, nubes)
             else:
                 res = _tiles("ls", vis, fecha, f0, f1, nubes)
