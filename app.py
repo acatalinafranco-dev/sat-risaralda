@@ -68,7 +68,7 @@ def _comparativo_v2(fecha_consulta: str):
 
 res = {"filas": [], "errores": []}
 if conectado:
-    with st.spinner("Calculando el nivel de atención de los 14 municipios "
+    with st.spinner("Calculando los indicadores de los 14 municipios "
                     "(la primera carga del día puede tardar unos minutos)..."):
         try:
             res = _comparativo_v2(dt.date.today().isoformat())
@@ -89,88 +89,85 @@ for col in ("lluvia_7d", "lluvia_30d", "pct_normal_30d", "perdida_ha", "perdida_
 _am = riesgo.amenaza_municipal().set_index("codigo")
 df["alta_muy_alta"] = df["codigo"].map(_am["alta_muy_alta"])
 df["eventos"] = df["codigo"].map(riesgo.eventos_por_municipio()).fillna(0).astype(int)
-df["nivel"] = [
-    riesgo.nivel_atencion(None if pd.isna(p) else p, None if pd.isna(a) else a)
-    for p, a in zip(df["pct_normal_30d"], df["alta_muy_alta"])
-]
 _info = df.set_index("codigo").to_dict("index")
 
-# --- Mapa coloreado por nivel de atención + módulos -------------------------
+# --- Mapa por municipio + resumen -----------------------------------------
 c1, c2 = st.columns([1.4, 1])
 
+_VARIABLES = {
+    "Lluvia 30 d (% de la normal)": "pct_normal_30d",
+    "Área en amenaza alta y muy alta (%)": "alta_muy_alta",
+    "Eventos SIMMA": "eventos",
+}
+
 with c1:
-    st.markdown("#### Nivel de atención por municipio")
+    st.markdown("#### Mapa por municipio")
+    var = st.radio("Variable del mapa", list(_VARIABLES), horizontal=True,
+                   key="mapa_var")
+    clave = _VARIABLES[var]
+    vals = [d_[clave] for d_ in _info.values()
+            if d_.get(clave) is not None and not pd.isna(d_[clave])]
+    vmin, vmax = (min(vals), max(vals)) if vals else (0.0, 1.0)
+
+    def _color(v):
+        if v is None or pd.isna(v):
+            return "#b0b7bd"
+        t = 0.0 if vmax == vmin else (v - vmin) / (vmax - vmin)
+        a, b = (222, 235, 247), (8, 81, 156)
+        return "#%02x%02x%02x" % tuple(int(a[i] + t * (b[i] - a[i])) for i in range(3))
+
     gj = json.loads(json.dumps(geojson_municipios()))
     for f in gj["features"]:
-        d = _info.get(f["properties"]["codigo"], {})
-        f["properties"]["nivel"] = d.get("nivel", "Sin dato")
-        pn = d.get("pct_normal_30d")
+        d_ = _info.get(f["properties"]["codigo"], {})
+        pn = d_.get("pct_normal_30d")
         f["properties"]["lluvia"] = ("s/d" if pn is None or pd.isna(pn)
                                      else f"{pn:.0f} % de la normal")
-        f["properties"]["amenaza"] = f"{d.get('alta_muy_alta', 0):.0f} %"
+        f["properties"]["amenaza"] = f"{d_.get('alta_muy_alta', 0):.0f} %"
+        f["properties"]["eventos"] = str(int(d_.get("eventos", 0)))
+        f["properties"]["color"] = _color(d_.get(clave))
     m = mapa_base(zoom=9, basemap="SATELLITE")
     folium.GeoJson(
-        gj, name="Nivel de atención",
+        gj, name=var,
         style_function=lambda f: {
             "color": "#ffffff", "weight": 1.5,
-            "fillColor": riesgo.COLOR_NIVEL[f["properties"]["nivel"]],
-            "fillOpacity": 0.55,
+            "fillColor": f["properties"]["color"], "fillOpacity": 0.6,
         },
         tooltip=folium.GeoJsonTooltip(
-            fields=["nombre", "nivel", "lluvia", "amenaza"],
-            aliases=["Municipio", "Nivel de atención",
-                     "Lluvia 30 d", "Área en amenaza alta y muy alta"]),
+            fields=["nombre", "lluvia", "amenaza", "eventos"],
+            aliases=["Municipio", "Lluvia 30 d",
+                     "Área en amenaza alta y muy alta", "Eventos SIMMA"]),
     ).add_to(m)
     ajustar_al_municipio(m, margen=0.03)
     m.to_streamlit(height=470)
     st.markdown(
-        " ".join(f"<span style='background:{c};color:#fff;padding:2px 10px;"
-                 f"border-radius:10px;font-size:0.85rem;margin-right:4px'>{n}</span>"
-                 for n, c in riesgo.COLOR_NIVEL.items()),
+        f"<div style='display:flex;align-items:center;gap:8px;font-size:0.85rem'>"
+        f"<span>{vmin:.0f}</span>"
+        f"<div style='flex:0 0 220px;height:12px;border-radius:6px;"
+        f"background:linear-gradient(to right,#deebf7,#08519c)'></div>"
+        f"<span>{vmax:.0f}</span><span style='color:#666'>· {var}</span></div>",
         unsafe_allow_html=True)
 
 with c2:
-    st.markdown("#### Situación de hoy")
+    st.markdown("#### Resumen")
     st.caption(f"Fecha de corte: {dt.date.today().strftime('%d/%m/%Y')} · "
                f"Unidad de análisis: **{nombre_activo()}**")
-    n = df["nivel"].value_counts()
-    k1, k2, k3 = st.columns(3)
-    k1.metric("Alto", int(n.get("Alto", 0)))
-    k2.metric("Moderado", int(n.get("Moderado", 0)))
-    k3.metric("Bajo", int(n.get("Bajo", 0)))
-    altos = df[df["nivel"] == "Alto"]["nombre"].tolist()
-    if altos:
-        st.warning("**Nivel de atención alto:** " + ", ".join(sorted(altos)),
-                   icon="⚠️")
-    elif conectado and not res["errores"]:
-        st.success("Ningún municipio en nivel de atención alto.", icon="✅")
+    if df["pct_normal_30d"].notna().any():
+        i = df["pct_normal_30d"].idxmax()
+        st.metric("Mayor lluvia de 30 días frente a la normal",
+                  f"{df.loc[i, 'pct_normal_30d']:.0f} %",
+                  df.loc[i, "nombre"], delta_color="off")
+    j = df["alta_muy_alta"].idxmax()
+    st.metric("Mayor área en amenaza alta y muy alta",
+              f"{df.loc[j, 'alta_muy_alta']:.0f} %",
+              df.loc[j, "nombre"], delta_color="off")
+    st.metric("Eventos registrados en el SIMMA", int(df["eventos"].sum()),
+              help="Inventario y catálogo del SGC, suma de los 14 municipios.")
     if conectado:
         st.success("Google Earth Engine conectado ✔")
     st.info(
-        "**Nivel de atención provisional.** Combina la lluvia de los últimos "
-        "30 días frente a su normal y el porcentaje del municipio en amenaza "
-        "alta y muy alta (SGC). No es una alerta: las alertas oficiales "
-        "corresponden al IDEAM, al SGC y a los CMGRD/CDGRD.", icon="ℹ️")
-    with st.expander("¿Cómo se calcula el nivel de atención?"):
-        st.markdown(
-            """
-Se suman dos puntajes de 0 a 3:
-
-| Puntaje | Lluvia 30 días (% de la normal) | Área en amenaza alta y muy alta (SGC) |
-|---|---|---|
-| 0 | menos de 100 % | menos de 30 % |
-| 1 | 100 a 130 % | 30 a 60 % |
-| 2 | 130 a 170 % | 60 a 80 % |
-| 3 | más de 170 % | más de 80 % |
-
-**Bajo:** 0 a 2 puntos · **Moderado:** 3 a 4 · **Alto:** 5 a 6.
-
-La lluvia reciente viene de IMERG y la normal de CHIRPS (promedio de los
-últimos 20 años para la misma ventana); por ser productos distintos, el
-porcentaje es indicativo. Estos umbrales deben validarse con el SGC, el IDEAM
-y el inventario de eventos de CARDER antes de usarlos de forma oficial.
-"""
-        )
+        "Esta página presenta **indicadores**, no niveles de alerta. Las "
+        "alertas oficiales corresponden al IDEAM, al SGC y a los "
+        "CMGRD/CDGRD.", icon="ℹ️")
 
 st.divider()
 st.markdown("#### Módulos del sistema")
@@ -205,7 +202,7 @@ for e in res["errores"]:
     st.warning(f"No fue posible calcular una parte del comparativo. {e}")
 
 tabla = df.rename(columns={
-    "nombre": "Municipio", "nivel": "Nivel de atención",
+    "nombre": "Municipio",
     "area_km2": "Área (km²)",
     "lluvia_7d": "Lluvia 7 días (mm)", "lluvia_30d": "Lluvia 30 días (mm)",
     "pct_normal_30d": "Lluvia 30 d (% de la normal)",
@@ -213,23 +210,18 @@ tabla = df.rename(columns={
     "eventos": "Eventos SIMMA",
     "perdida_ha": "Pérdida de vegetación (ha)",
     "perdida_pct": "% del área municipal",
-})[["Municipio", "Nivel de atención", "Lluvia 7 días (mm)",
+})[["Municipio", "Lluvia 7 días (mm)",
     "Lluvia 30 días (mm)", "Lluvia 30 d (% de la normal)",
     "Amenaza alta y muy alta (% área)", "Eventos SIMMA",
     "Pérdida de vegetación (ha)", "% del área municipal", "Área (km²)"]]
 orden = st.radio(
-    "Ordenar por", ["Municipio", "Nivel de atención", "Lluvia 30 d (% de la normal)",
+    "Ordenar por", ["Municipio", "Lluvia 30 d (% de la normal)",
                     "Amenaza alta y muy alta (% área)", "Eventos SIMMA",
                     "Pérdida de vegetación (ha)"],
     horizontal=True,
 )
-if orden == "Nivel de atención":
-    tabla = tabla.assign(_o=tabla["Nivel de atención"].map(
-        {"Alto": 0, "Moderado": 1, "Bajo": 2, "Sin dato": 3})
-    ).sort_values(["_o", "Municipio"]).drop(columns="_o")
-else:
-    tabla = tabla.sort_values(orden, ascending=(orden == "Municipio"),
-                              na_position="last")
+tabla = tabla.sort_values(orden, ascending=(orden == "Municipio"),
+                          na_position="last")
 st.dataframe(
     tabla, hide_index=True, use_container_width=True,
     column_config={
