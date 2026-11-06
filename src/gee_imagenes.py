@@ -280,8 +280,20 @@ def escenas_s1(fecha_ini: str, fecha_fin: str, pol: str = "VV") -> list[dict]:
 
 
 def tiles_s1(pol: str, fecha: str | None, fecha_ini: str, fecha_fin: str) -> dict:
-    """Escena SAR individual o compuesto mediano del rango (dB)."""
-    if fecha:
+    """Escena SAR individual, mosaico reciente o compuesto mediano del rango (dB)."""
+    if fecha and fecha.startswith("ULT:"):
+        # Mosaico de los N días previos al fin del rango, de una sola órbita
+        # (ascendente o descendente): una pasada cubre solo una franja y el
+        # departamento queda entre varias trayectorias; se toma el último
+        # valor disponible por píxel.
+        _, n_dias, orb = fecha.split(":")
+        ini = ee.Date(fecha_fin).advance(-int(n_dias), "day").format("YYYY-MM-dd").getInfo()
+        col = _s1_coleccion(ini, fecha_fin, pol).filter(
+            ee.Filter.eq("orbitProperties_pass", orb))
+        img = col.sort("system:time_start").mosaic()
+        etiqueta = (f"Mosaico {pol} de {n_dias} días hasta {fecha_fin}, órbita "
+                    f"{orb.lower()} (último valor por píxel)")
+    elif fecha:
         f0 = ee.Date(fecha)
         col = _s1_coleccion(fecha, f0.advance(1, "day").format("YYYY-MM-dd").getInfo(), pol)
         img = col.mosaic()
