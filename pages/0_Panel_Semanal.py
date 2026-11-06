@@ -115,7 +115,9 @@ else:
     k1.metric("Mayor lluvia en 7 días", "s/d")
 if s1:
     u = max(s1, key=lambda e: e["fecha"])
-    k2.metric("Última pasada Sentinel-1", u["fecha"], u["orbita"].lower(),
+    k2.metric("Última pasada Sentinel-1", u["fecha"],
+              {"ASCENDING": "ascendente", "DESCENDING": "descendente"}.get(
+                  u["orbita"].upper(), u["orbita"].lower()),
               delta_color="off", help="Pasada de radar más reciente sobre la zona.")
 else:
     k2.metric("Última pasada Sentinel-1", "s/d")
