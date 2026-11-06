@@ -98,7 +98,21 @@ def tiles_s2(vis_key: str, fecha: str | None, fecha_ini: str, fecha_fin: str,
              max_nubes: float = 60) -> dict:
     """Tiles de una escena S2 (por fecha) o del compuesto mediano del rango."""
     vis = VIS_S2[vis_key]
-    if fecha:
+    if fecha and fecha.startswith("ULT:"):
+        n_dias = int(fecha.split(":")[1])
+        ini = ee.Date(fecha_fin).advance(-n_dias, "day").format("YYYY-MM-dd").getInfo()
+
+        def _sin_nubes(im):
+            scl = im.select("SCL")
+            malo = (scl.eq(3).Or(scl.eq(8)).Or(scl.eq(9)).Or(scl.eq(10))
+                    .Or(scl.eq(1)).Or(scl.eq(0)))
+            return im.updateMask(malo.Not())
+
+        col = _s2_coleccion(ini, fecha_fin, 100).map(_sin_nubes)
+        img = col.sort("system:time_start").mosaic()
+        etiqueta = (f"Mosaico de {n_dias} días hasta {fecha_fin} sin nubes "
+                    "(último valor despejado por píxel)")
+    elif fecha:
         f0 = ee.Date(fecha)
         col = _s2_coleccion(fecha, f0.advance(1, "day").format("YYYY-MM-dd").getInfo(), 100)
         img = col.mosaic()
@@ -174,7 +188,14 @@ def escenas_landsat(fecha_ini: str, fecha_fin: str, max_nubes: float = 70) -> li
 def tiles_landsat(vis_key: str, fecha: str | None, fecha_ini: str, fecha_fin: str,
                   max_nubes: float = 70) -> dict:
     vis = VIS_LANDSAT[vis_key]
-    if fecha:
+    if fecha and fecha.startswith("ULT:"):
+        n_dias = int(fecha.split(":")[1])
+        ini = ee.Date(fecha_fin).advance(-n_dias, "day").format("YYYY-MM-dd").getInfo()
+        col = _landsat_coleccion(ini, fecha_fin, 100)
+        img = col.sort("system:time_start").mosaic()
+        etiqueta = (f"Mosaico de {n_dias} días hasta {fecha_fin} sin nubes "
+                    "(último valor despejado por píxel)")
+    elif fecha:
         f0 = ee.Date(fecha)
         col = _landsat_coleccion(
             fecha, f0.advance(1, "day").format("YYYY-MM-dd").getInfo(), 100
