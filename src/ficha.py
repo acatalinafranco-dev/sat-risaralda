@@ -17,18 +17,6 @@ VERDE = colors.HexColor(VERDE_CARDER)
 GRIS = colors.HexColor("#555555")
 GRIS_CLARO = colors.HexColor("#e6eaed")
 
-RECOMENDACION = {
-    "Alto": ("Se sugiere priorizar el seguimiento diario de la lluvia, verificar "
-             "en campo las laderas con eventos previos y coordinar con el "
-             "Consejo Municipal de Gestión del Riesgo (CMGRD)."),
-    "Moderado": ("Se sugiere mantener el seguimiento de la lluvia varias veces "
-                 "por semana y revisar los puntos con eventos registrados."),
-    "Bajo": ("Se sugiere continuar el seguimiento rutinario. Un nivel bajo no "
-             "descarta la ocurrencia de eventos locales."),
-    "Sin dato": "No fue posible calcular el nivel de atención con los datos disponibles.",
-}
-
-
 def _num(v, fmt="{:.0f}", vacio="s/d") -> str:
     return vacio if v is None or v != v else fmt.format(v)
 
@@ -43,7 +31,7 @@ def _parrafo(c, texto, x, y, ancho, fuente="Helvetica", tam=9.5, interlin=12.5,
     return y
 
 
-def generar_ficha(fila: dict, nivel: str, amenaza: dict, eventos_tipo: dict,
+def generar_ficha(fila: dict, amenaza: dict, eventos_tipo: dict,
                   n_inventario: int) -> bytes:
     """`fila`: codigo, nombre, area_km2, lluvia_7d, lluvia_30d, normal_30d,
     pct_normal_30d, perdida_ha, perdida_pct (de tabla_comparativa).
@@ -90,18 +78,6 @@ def generar_ficha(fila: dict, nivel: str, amenaza: dict, eventos_tipo: dict,
     c.drawString(mx, y, f"Movimientos en masa · Risaralda · Código DANE {fila['codigo']} · "
                         f"Área {_num(fila.get('area_km2'), '{:,.0f}')} km²")
     y -= 24
-
-    # Nivel de atención ----------------------------------------------------
-    col = colors.HexColor(riesgo.COLOR_NIVEL.get(nivel, "#b0b7bd"))
-    c.setFillColor(col)
-    c.roundRect(mx, y - 40, util, 44, 6, fill=1, stroke=0)
-    c.setFillColor(colors.white if nivel != "Moderado" else colors.black)
-    c.setFont("Helvetica-Bold", 15)
-    c.drawString(mx + 14, y - 14, f"Nivel de atención: {nivel.upper()}")
-    c.setFont("Helvetica", 8.5)
-    c.drawString(mx + 14, y - 30, "Provisional · combina lluvia de 30 días frente a su "
-                                  "normal y amenaza por movimientos en masa (SGC)")
-    y -= 62
 
     # Indicadores ------------------------------------------------------------
     c.setFillColor(AZUL)
@@ -180,14 +156,13 @@ def generar_ficha(fila: dict, nivel: str, amenaza: dict, eventos_tipo: dict,
     c.setFont("Helvetica-Bold", 11)
     c.drawString(mx, y, "Lectura")
     y -= 14
-    pa = riesgo._puntos_amenaza(amenaza.get("alta_muy_alta"))
-    pl = riesgo._puntos_lluvia(fila.get("pct_normal_30d"))
-    texto = (f"La lluvia de los últimos 30 días equivale a "
-             f"{_num(fila.get('pct_normal_30d'))} % de la normal (puntaje "
-             f"{'s/d' if pl is None else pl} de 3) y el "
-             f"{_num(amenaza.get('alta_muy_alta'))} % del área municipal se encuentra en "
-             f"amenaza alta o muy alta (puntaje {'s/d' if pa is None else pa} de 3). "
-             + RECOMENDACION[nivel])
+    texto = (f"En los últimos 30 días la lluvia equivale a "
+             f"{_num(fila.get('pct_normal_30d'))} % de la normal. El "
+             f"{_num(amenaza.get('alta_muy_alta'))} % del área municipal se "
+             f"encuentra en amenaza alta o muy alta (SGC, 2015) y el SIMMA "
+             f"registra {sum(eventos_tipo.values())} eventos en el municipio. "
+             "Los indicadores son referenciales y se presentan para apoyar el "
+             "seguimiento; no constituyen una alerta.")
     y = _parrafo(c, texto, mx, y, util)
 
     # Pie ----------------------------------------------------------------------------
@@ -195,8 +170,7 @@ def generar_ficha(fila: dict, nivel: str, amenaza: dict, eventos_tipo: dict,
     c.line(mx, 92, ancho - mx, 92)
     pie = ("Herramienta de apoyo al conocimiento del riesgo. No sustituye las alertas "
            "oficiales del IDEAM ni las decisiones de los consejos de gestión del riesgo. "
-           "El nivel de atención es provisional y sus umbrales están pendientes de "
-           "validación. Fuentes: NASA GPM IMERG, UCSB CHIRPS, Copernicus Sentinel-2, "
+           "Los indicadores son referenciales. Fuentes: NASA GPM IMERG, UCSB CHIRPS, Copernicus Sentinel-2, "
            "Servicio Geológico Colombiano (amenaza 2015 y SIMMA), DANE (DIVIPOLA). "
            f"Calculado con Google Earth Engine. Contacto: {CONTACTO}")
     _parrafo(c, pie, mx, 80, util, tam=7.5, interlin=9.5, color=GRIS)
