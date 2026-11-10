@@ -11,6 +11,7 @@ import sys
 from pathlib import Path
 
 import folium
+from folium.plugins import SideBySideLayers
 import pandas as pd
 import streamlit as st
 
@@ -180,6 +181,10 @@ superficie con cambio fuerte sobre laderas.
   valores extremos. Resulta útil para observar una condición típica, pero no
   muestra un momento concreto.
 
+- **Comparador (deslizador):** superpone dos imágenes del mismo sensor y
+  permite desplazar una barra para ver una a cada lado. Debe usarse con la
+  misma visualización y, en radar, con la misma órbita y polarización.
+
 En Sentinel-2 y Landsat, la opción por defecto es la escena original más
 reciente; el mosaico es una opción adicional. En Sentinel-1, el mosaico
 descendente de 12 días es la opción por defecto, porque cubre toda la zona.
@@ -309,6 +314,7 @@ def _pintar(res: dict, altura: int = 560):
 sensor = st.radio(
     "Sensor",
     ["Sentinel-2 (óptico 10 m)", "Landsat 8/9 (óptico 30 m)", "Sentinel-1 (radar)",
+     "Comparar dos fechas (deslizador)",
      "GOES-Este (cada 10 min)", "MODIS/VIIRS diario (NASA GIBS)"],
     horizontal=True,
     label_visibility="collapsed",
@@ -465,6 +471,110 @@ if sensor == "Sentinel-1 (radar)":
             st.dataframe(pd.DataFrame(escenas).rename(
                 columns={"fecha": "Fecha", "orbita": "Órbita"}),
                 use_container_width=True, hide_index=True)
+
+# --------------------------------------------------------------------------
+# COMPARADOR (deslizador entre dos imágenes)
+# --------------------------------------------------------------------------
+if sensor == "Comparar dos fechas (deslizador)":
+    st.caption(
+        "Superpone dos imágenes del mismo sensor y permite desplazar una barra "
+        "vertical sobre el mapa: la imagen A se muestra a la izquierda de la "
+        "barra y la imagen B a la derecha. Sirve para identificar cambios "
+        "entre dos fechas, como cicatrices nuevas, pérdida de vegetación o "
+        "cambios en cauces."
+    )
+    tipo = st.radio("Sensor a comparar",
+                    ["Sentinel-2 (óptico)", "Landsat 8/9 (óptico)",
+                     "Sentinel-1 (radar)"], horizontal=True, key="cmp_tipo")
+    f0, f1 = _selector_fechas("cmp", dias_atras=180)
+    opciones_cmp: dict[str, str | None] = {}
+    args_cmp: tuple = ()
+    sensor_cmp = "s2"
+    if tipo == "Sentinel-2 (óptico)":
+        c1, c2 = st.columns(2)
+        with c1:
+            nubes = st.slider("Nubosidad máxima de escena (%)", 5, 100, 60, 5,
+                              key="cmp_nb")
+        with c2:
+            vis = st.selectbox("Visualización", list(gi.VIS_S2.keys()),
+                               format_func=lambda k: gi.VIS_S2[k]["nombre"],
+                               key="cmp_vis_s2")
+        escenas = sorted(_cat_s2(f0, f1, nubes), key=lambda e: e["fecha"])
+        for e in escenas:
+            opciones_cmp[f"{e['fecha']}  ·  {e['nubes']:.0f}% nubes"] = e["fecha"]
+        sensor_cmp, args_cmp = "s2", (vis)
+        resto = (f0, f1, nubes)
+    elif tipo == "Landsat 8/9 (óptico)":
+        c1, c2 = st.columns(2)
+        with c1:
+            nubes = st.slider("Nubosidad máxima de escena (%)", 5, 100, 70, 5,
+                              key="cmp_nb_ls")
+        with c2:
+            vis = st.selectbox("Visualización", list(gi.VIS_LANDSAT.keys()),
+                               format_func=lambda k: gi.VIS_LANDSAT[k]["nombre"],
+                               key="cmp_vis_ls")
+        escenas = sorted(_cat_ls(f0, f1, nubes), key=lambda e: e["fecha"])
+        for e in escenas:
+            opciones_cmp[f"{e['fecha']}  ·  {e['nubes']:.0f}% nubes  ·  "
+                         f"{e['satelite']}"] = e["fecha"]
+        sensor_cmp, args_cmp = "ls", (vis)
+        resto = (f0, f1, nubes)
+    else:
+        c1, c2 = st.columns(2)
+        with c1:
+            pol = st.selectbox("Polarización", ["VV", "VH"], key="cmp_pol")
+        with c2:
+            orb = st.selectbox(
+                "Órbita", ["Descendente", "Ascendente"], key="cmp_orb",
+                help="Solo deben compararse imágenes de la misma órbita.")
+        todas = _cat_s1(f0, f1, pol)
+        clave = "DESCENDING" if orb == "Descendente" else "ASCENDING"
+        escenas = sorted([e for e in todas
+                          if str(e["orbita"]).upper() == clave],
+                         key=lambda e: e["fecha"])
+        for e in escenas:
+            opciones_cmp[f"{e['fecha']}  ·  órbita {orb.lower()}"] = e["fecha"]
+        sensor_cmp, args_cmp = "s1", (pol)
+        resto = (f0, f1)
+
+    etiquetas_cmp = list(opciones_cmp.keys())
+    if len(etiquetas_cmp) < 2:
+        st.warning("Se requieren al menos dos imágenes en el rango para "
+                   "comparar. Amplíe las fechas o ajuste los filtros.")
+    else:
+        ca, cb = st.columns(2)
+        with ca:
+            sel_a = st.selectbox("Imagen A (izquierda)", etiquetas_cmp,
+                                 index=0, key="cmp_a")
+        with cb:
+            sel_b = st.selectbox("Imagen B (derecha)", etiquetas_cmp,
+                                 index=len(etiquetas_cmp) - 1, key="cmp_b")
+        if sel_a == sel_b:
+            st.info("Seleccione dos imágenes distintas para ver la diferencia.")
+        with st.spinner("Generando las dos imágenes..."):
+            res_a = _tiles(sensor_cmp, args_cmp, opciones_cmp[sel_a], *resto)
+            res_b = _tiles(sensor_cmp, args_cmp, opciones_cmp[sel_b], *resto)
+        m = mapa_base(zoom=12, basemap="Esri.WorldImagery")
+        capa_a = folium.TileLayer(
+            tiles=res_a["tiles_url"], attr="Google Earth Engine / Copernicus / USGS",
+            name="Imagen A", overlay=True, control=False)
+        capa_b = folium.TileLayer(
+            tiles=res_b["tiles_url"], attr="Google Earth Engine / Copernicus / USGS",
+            name="Imagen B", overlay=True, control=False)
+        capa_a.add_to(m)
+        capa_b.add_to(m)
+        SideBySideLayers(layer_left=capa_a, layer_right=capa_b).add_to(m)
+        agregar_contorno(m)
+        ajustar_al_municipio(m, margen=0.008)
+        m.to_streamlit(height=560)
+        st.caption(
+            f"**Izquierda (A):** {sel_a.split('·')[0].strip()}  ·  "
+            f"**Derecha (B):** {sel_b.split('·')[0].strip()}  ·  "
+            f"{res_a['nombre']}. Desplace la barra central para comparar. "
+            "Las diferencias pueden deberse a cambios reales del terreno, pero "
+            "también a nubes, sombras, humedad o a la época del año; conviene "
+            "verificarlas en campo."
+        )
 
 # --------------------------------------------------------------------------
 # GOES-ESTE (geoestacionario · casi tiempo real)
