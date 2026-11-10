@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import base64
 import io
+import tempfile
 from functools import lru_cache
 from pathlib import Path
 
@@ -48,31 +49,27 @@ GRADIENTE = f"linear-gradient(to right, {AZUL_CARDER}, {VERDE_CARDER}, {AMARILLO
 
 @lru_cache(maxsize=1)
 def _logo_fondo_blanco() -> bytes | None:
-    """Devuelve el logo compuesto sobre fondo blanco (PNG en bytes)."""
-    if not RUTA_LOGO.exists():
-        return None
+    """Logo institucional (PNG vertical sobre fondo blanco) en bytes."""
     try:
-        from PIL import Image
+        from .logo_data import LOGO_B64
 
-        img = Image.open(RUTA_LOGO).convert("RGBA")
-        fondo = Image.new("RGBA", img.size, (255, 255, 255, 255))
-        fondo.paste(img, (0, 0), img)
-        buf = io.BytesIO()
-        fondo.convert("RGB").save(buf, format="PNG")
-        return buf.getvalue()
+        return base64.b64decode(LOGO_B64)
     except Exception:
-        try:
-            return RUTA_LOGO.read_bytes()
-        except Exception:
-            return None
+        return None
 
 
 @lru_cache(maxsize=1)
 def _logo_b64() -> str | None:
-    try:
-        return base64.b64encode(RUTA_LOGO.read_bytes()).decode()
-    except Exception:
-        return None
+    datos = _logo_fondo_blanco()
+    return base64.b64encode(datos).decode() if datos else None
+
+
+_CSS_LOGO = """<style>
+[data-testid="stSidebarHeader"]{height:auto !important;padding-bottom:0.5rem}
+[data-testid="stSidebarHeader"] img,[data-testid="stSidebarLogo"],
+img[data-testid="stLogo"]{height:9rem !important;max-width:none !important;
+width:auto !important}
+</style>"""
 
 
 def selector_municipio() -> None:
@@ -121,11 +118,12 @@ def branding_institucional() -> None:
     Idempotente: seguro de llamar en cada página."""
     datos = _logo_fondo_blanco()
     if datos:
-        ruta_tmp = RUTA_LOGO.parent / "_carder_blanco.png"
+        ruta_tmp = Path(tempfile.gettempdir()) / "_carder_logo.png"
         try:
             if not ruta_tmp.exists():
                 ruta_tmp.write_bytes(datos)
             st.logo(str(ruta_tmp), size="large")
+            st.markdown(_CSS_LOGO, unsafe_allow_html=True)
         except Exception:
             pass
 
