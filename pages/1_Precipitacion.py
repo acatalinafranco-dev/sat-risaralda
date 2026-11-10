@@ -286,6 +286,102 @@ else:
 st.divider()
 st.markdown("### Climatología CHIRPS · promedio de los últimos 20 años")
 
+with st.expander("📖 Guía: qué es la climatología y para qué sirve", expanded=True):
+    g1, g2, g3, g4 = st.tabs(["¿Qué es?", "¿Para qué sirve?", "Cómo leer esta sección",
+                              "Límites"])
+    with g1:
+        st.markdown(
+            """
+**La idea en una frase.** La climatología responde a la pregunta *¿cuánto
+llueve normalmente aquí, y en qué épocas?*
+
+**De dónde sale.** Se toma la lluvia diaria de **CHIRPS**, un producto de la
+Universidad de California en Santa Bárbara que combina imágenes de satélite con
+datos de estaciones en tierra, disponible desde 1981. La aplicación promedia
+los **últimos 20 años** para cada mes y para el año completo.
+
+**Qué muestra esta sección.**
+
+- **Gráfico de barras:** el promedio de lluvia de cada mes (en milímetros),
+  para la zona seleccionada. Permite ver qué meses suelen ser más lluviosos y
+  cuáles más secos.
+- **Cifra de precipitación media anual:** cuántos milímetros llueven en
+  promedio durante un año completo en la zona seleccionada.
+- **Mapa de media anual:** muestra cómo se reparte esa lluvia en el territorio.
+  Los tonos más oscuros indican zonas donde llueve más; los claros, donde llueve
+  menos.
+
+**En resumen.** La climatología es lo **normal** de la lluvia y sirve de
+punto de comparación para juzgar la lluvia de hoy.
+"""
+        )
+    with g2:
+        st.markdown(
+            """
+**1. Saber si la lluvia reciente es normal o no.**
+La aplicación compara la lluvia de los últimos 30 días con el promedio de
+esos mismos días en 20 años. El resultado aparece como **«% de la normal»** en
+la página de inicio, en el comparativo de municipios y en las fichas
+municipales. Por ejemplo: 150 % significa que ha llovido una vez y media lo
+habitual para esa época.
+
+**2. Conocer las temporadas lluviosas y secas.**
+El gráfico mensual muestra en qué meses suele llover más. Esto ayuda a
+anticipar las épocas en que conviene reforzar el seguimiento de las laderas y
+programar visitas de campo o jornadas de prevención con las comunidades.
+
+**3. Identificar las zonas más húmedas del departamento.**
+El mapa de media anual permite ver dónde llueve más, lo que ayuda a priorizar
+el seguimiento en las zonas donde la lluvia es históricamente mayor.
+
+**4. Poner un evento en contexto.**
+Si ocurrió un movimiento en masa, se puede revisar si el mes fue excepcional o
+estuvo dentro de lo habitual. Sirve para los informes técnicos y para explicar
+a la comunidad y a los consejos de gestión del riesgo qué ocurrió.
+
+**5. Sustentar decisiones de planificación.**
+Los promedios mensuales y anuales respaldan, con datos, la programación de
+actividades de conocimiento y reducción del riesgo.
+
+**¿Quién la puede usar?** Funcionarios de la CARDER, integrantes de los
+consejos municipales de gestión del riesgo (CMGRD) y cualquier persona que
+necesite entender el régimen de lluvias de su municipio.
+"""
+        )
+    with g3:
+        st.markdown(
+            """
+- **Barras altas:** meses de mayor lluvia promedio. **Barras bajas:** meses más
+  secos. Revise cuántas temporadas lluviosas aparecen en el año: en la región
+  andina colombiana suelen ser dos.
+- **Cifra anual:** es un promedio del polígono seleccionado. Cambie el
+  municipio en la barra lateral para ver cómo varía entre municipios.
+- **Mapa:** compare las zonas oscuras y claras. No indica cuánto llovió esta
+  semana, sino cuánto llueve **en promedio en un año**.
+- **Pase el puntero** sobre un municipio para ver su nombre y su área cuando
+  tiene seleccionado «Todo Risaralda».
+- **Relación con las secciones de arriba:** las series y los mapas diarios
+  muestran lo que llovió **recientemente**; esta sección muestra lo que llueve
+  **normalmente**. Las dos juntas permiten saber si lo reciente es mucho o poco.
+"""
+        )
+    with g4:
+        st.markdown(
+            """
+- **No es una predicción ni una alerta.** Describe lo que ha ocurrido en
+  promedio, no lo que va a ocurrir.
+- **Es una estimación satelital.** CHIRPS tiene celdas de unos 5 km. Describe
+  bien el patrón regional, pero no la lluvia exacta de una vereda o un sitio.
+- **Veinte años es un periodo corto.** Las normales climáticas oficiales se
+  calculan con 30 años y con estaciones, y las publica el IDEAM. Los valores de
+  esta página son **indicativos** y no sustituyen las normales del IDEAM.
+- **Años extremos.** Un año con El Niño o La Niña muy intensos puede mover el
+  promedio de 20 años. La climatología no separa estos años.
+- Herramienta de apoyo al conocimiento del riesgo: no sustituye las alertas
+  oficiales del IDEAM ni las decisiones de los consejos de gestión del riesgo.
+"""
+        )
+
 cc1, cc2 = st.columns(2)
 
 with cc1:
@@ -307,8 +403,9 @@ with cc1:
         st.metric("Precipitación media anual (polígono seleccionado)",
                   f"{clim['anual_mm']:,.0f} mm/año")
         st.caption(
-            "La estacionalidad marca las ventanas críticas del SAT: los meses "
-            "pico concentran la mayor probabilidad de movimientos en masa."
+            "Los meses de mayor lluvia promedio son las épocas en que conviene "
+            "reforzar el seguimiento de las laderas. La lluvia alta aumenta la "
+            "probabilidad de movimientos en masa, pero no los determina por sí sola."
         )
 
 with cc2:
