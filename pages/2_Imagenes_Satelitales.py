@@ -486,6 +486,15 @@ if sensor == "Comparar dos fechas (deslizador)":
     tipo = st.radio("Sensor a comparar",
                     ["Sentinel-2 (óptico)", "Landsat 8/9 (óptico)",
                      "Sentinel-1 (radar)"], horizontal=True, key="cmp_tipo")
+    modo = st.radio(
+        "Tipo de imagen",
+        ["Escenas individuales", "Mosaicos por período (cobertura completa)"],
+        horizontal=True, key="cmp_modo",
+        help="Una escena individual cubre solo una franja y puede tener "
+             "nubes. El mosaico une las tomas de los 30 días previos a la "
+             "fecha elegida (12 días en radar) y cubre todo el departamento, "
+             "lo que facilita ver cambios entre dos épocas.")
+    clave = None
     f0, f1 = _selector_fechas("cmp", dias_atras=180)
     opciones_cmp: dict[str, str | None] = {}
     args_cmp: tuple = ()
@@ -538,22 +547,45 @@ if sensor == "Comparar dos fechas (deslizador)":
         resto = (f0, f1)
 
     etiquetas_cmp = list(opciones_cmp.keys())
-    if len(etiquetas_cmp) < 2:
+    por_periodo = modo.startswith("Mosaicos")
+    if not por_periodo and len(etiquetas_cmp) < 2:
         st.warning("Se requieren al menos dos imágenes en el rango para "
-                   "comparar. Amplíe las fechas o ajuste los filtros.")
+                   "comparar. Amplíe las fechas, ajuste los filtros o use "
+                   "los mosaicos por período.")
     else:
         ca, cb = st.columns(2)
-        with ca:
-            sel_a = st.selectbox("Imagen A (izquierda)", etiquetas_cmp,
-                                 index=0, key="cmp_a")
-        with cb:
-            sel_b = st.selectbox("Imagen B (derecha)", etiquetas_cmp,
-                                 index=len(etiquetas_cmp) - 1, key="cmp_b")
-        if sel_a == sel_b:
-            st.info("Seleccione dos imágenes distintas para ver la diferencia.")
-        with st.spinner("Generando las dos imágenes..."):
-            res_a = _tiles(sensor_cmp, args_cmp, opciones_cmp[sel_a], *resto)
-            res_b = _tiles(sensor_cmp, args_cmp, opciones_cmp[sel_b], *resto)
+        if por_periodo:
+            hoy = dt.date.today()
+            with ca:
+                fin_a = st.date_input("Fin del período A (izquierda)",
+                                      hoy - dt.timedelta(days=90),
+                                      max_value=hoy, key="cmp_fa")
+            with cb:
+                fin_b = st.date_input("Fin del período B (derecha)", hoy,
+                                      max_value=hoy, key="cmp_fb")
+            ventana = 12 if sensor_cmp == "s1" else 30
+            codigo = f"ULT:{ventana}" + (f":{clave}" if sensor_cmp == "s1" else "")
+            ini_a = (fin_a + dt.timedelta(days=1)).isoformat()
+            ini_b = (fin_b + dt.timedelta(days=1)).isoformat()
+            with st.spinner("Generando los dos mosaicos..."):
+                res_a = _tiles(sensor_cmp, args_cmp, codigo, f0, ini_a, *resto[2:])
+                res_b = _tiles(sensor_cmp, args_cmp, codigo, f0, ini_b, *resto[2:])
+            txt_a = f"mosaico de {ventana} días hasta {fin_a.isoformat()}"
+            txt_b = f"mosaico de {ventana} días hasta {fin_b.isoformat()}"
+        else:
+            with ca:
+                sel_a = st.selectbox("Imagen A (izquierda)", etiquetas_cmp,
+                                     index=0, key="cmp_a")
+            with cb:
+                sel_b = st.selectbox("Imagen B (derecha)", etiquetas_cmp,
+                                     index=len(etiquetas_cmp) - 1, key="cmp_b")
+            if sel_a == sel_b:
+                st.info("Seleccione dos imágenes distintas para ver la diferencia.")
+            with st.spinner("Generando las dos imágenes..."):
+                res_a = _tiles(sensor_cmp, args_cmp, opciones_cmp[sel_a], *resto)
+                res_b = _tiles(sensor_cmp, args_cmp, opciones_cmp[sel_b], *resto)
+            txt_a = sel_a.split("·")[0].strip()
+            txt_b = sel_b.split("·")[0].strip()
         m = mapa_base(zoom=12, basemap="Esri.WorldImagery")
         capa_a = folium.TileLayer(
             tiles=res_a["tiles_url"], attr="Google Earth Engine / Copernicus / USGS",
@@ -568,12 +600,14 @@ if sensor == "Comparar dos fechas (deslizador)":
         ajustar_al_municipio(m, margen=0.008)
         m.to_streamlit(height=560)
         st.caption(
-            f"**Izquierda (A):** {sel_a.split('·')[0].strip()}  ·  "
-            f"**Derecha (B):** {sel_b.split('·')[0].strip()}  ·  "
-            f"{res_a['nombre']}. Desplace la barra central para comparar. "
-            "Las diferencias pueden deberse a cambios reales del terreno, pero "
-            "también a nubes, sombras, humedad o a la época del año; conviene "
-            "verificarlas en campo."
+            f"**Izquierda (A):** {txt_a}  ·  **Derecha (B):** {txt_b}  ·  "
+            f"{res_a['nombre']}. Desplace la barra central para comparar y "
+            "**acerque el mapa** a la zona de interés: los cambios en laderas "
+            "(cicatrices, pérdida de vegetación) miden decenas de metros y no "
+            "se aprecian a la escala del departamento. Las diferencias pueden "
+            "deberse a cambios reales del terreno, pero también a nubes, "
+            "sombras, humedad o a la época del año; conviene verificarlas en "
+            "campo."
         )
 
 # --------------------------------------------------------------------------
