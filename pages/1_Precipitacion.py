@@ -16,9 +16,18 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from src import gee_precipitacion as gp
+from src.gee_session import es_departamento
 from src.ui import (cache_mun, COLOR_FUENTE, MESES_ES, NOMBRE_FUENTE, agregar_contorno,
-                    ajustar_al_municipio, conectar_gee, encabezado,
-                    leyenda_continua, mapa_base, pie_institucional)
+                    agregar_municipios, ajustar_al_municipio, conectar_gee,
+                    encabezado, leyenda_continua, mapa_base, pie_institucional)
+
+
+def _limites(mapa) -> None:
+    """Contorno de la unidad activa; con Risaralda, la división municipal."""
+    if es_departamento():
+        agregar_municipios(mapa)
+    else:
+        agregar_contorno(mapa)
 
 st.set_page_config(page_title="Precipitación · SAT Risaralda", layout="wide",
                    page_icon="🌧️", initial_sidebar_state="expanded")
@@ -255,7 +264,7 @@ else:
                     attribution="GEE",
                     opacity=1.0,
                 )
-                agregar_contorno(m)
+                _limites(m)
                 ajustar_al_municipio(m, margen=0.015)
                 m.to_streamlit(height=260)
                 media_txt = (f"{pdef['media_mm']:.0f} mm" if pdef["media_mm"]
@@ -315,7 +324,7 @@ with cc2:
             attribution="Google Earth Engine",
             opacity=1.0,
         )
-        agregar_contorno(m2)
+        _limites(m2)
         ajustar_al_municipio(m2, margen=0.04)
         m2.to_streamlit(height=430)
         leyenda_continua(f"Media anual {mclim['periodo']}", mclim["vis"], "mm/año")
