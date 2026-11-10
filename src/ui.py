@@ -17,7 +17,8 @@ import leafmap.foliumap as leafmap
 import streamlit as st
 
 from .gee_session import (CODIGO_DEPTO, MUNICIPIO, bounds_municipio,
-                          centro_activo, codigo_activo, geojson_municipio,
+                          centro_activo, codigo_activo, es_departamento,
+                          geojson_municipio,
                           geojson_municipios, init_ee, lista_municipios,
                           nombre_activo)
 
@@ -238,6 +239,11 @@ def mapa_base(zoom: int = 12, basemap: str = "Esri.WorldImagery") -> leafmap.Map
 
 
 def agregar_contorno(m: leafmap.Map, nombre: str | None = None) -> None:
+    """Límite de la unidad activa. Con «Todo Risaralda» se dibuja la división
+    municipal completa, de modo que todos los mapas la muestren."""
+    if es_departamento():
+        agregar_municipios(m)
+        return
     folium.GeoJson(
         geojson_municipio(),
         name=nombre or f"Límite {nombre_activo()}",
@@ -249,6 +255,9 @@ def agregar_contorno(m: leafmap.Map, nombre: str | None = None) -> None:
 
 def agregar_municipios(m: leafmap.Map) -> None:
     """Pinta los 14 municipios con su nombre; resalta el elegido."""
+    if getattr(m, "_municipios_agregados", False):
+        return
+    m._municipios_agregados = True
     activo = codigo_activo()
 
     def _estilo(feat):
