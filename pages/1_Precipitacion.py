@@ -333,10 +333,6 @@ estaciones en tierra, disponible desde 1981. La aplicación promedia los
 5. **Planificación.** Los promedios mensuales y anuales sustentan con
    información la programación de actividades de conocimiento y reducción del
    riesgo.
-
-**Usuarios previstos:** funcionarios de la CARDER, consejos municipales y
-departamental de gestión del riesgo (CMGRD y CDGRD) y demás entidades que
-requieran caracterizar el régimen de lluvias.
 """
         )
     with g3:
