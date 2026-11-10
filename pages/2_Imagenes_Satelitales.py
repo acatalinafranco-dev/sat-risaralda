@@ -30,6 +30,213 @@ encabezado(
     "(cada 10 min) y **MODIS/VIIRS diario** (NASA GIBS).",
 )
 
+with st.expander("📖 Guía: cómo leer las imágenes satelitales y cuál sensor usar",
+                 expanded=False):
+    st.markdown(
+        "Esta página reúne imágenes de varios satélites. Cada uno observa la "
+        "superficie de una forma distinta, por lo que ninguno sustituye a los "
+        "demás: se complementan. La guía explica qué mide cada sensor, cómo "
+        "interpretar lo que se ve en pantalla y cuáles son sus límites."
+    )
+    t1, t2, t3, t4, t5, t6 = st.tabs([
+        "Óptico y radar", "Sentinel-2 y Landsat", "Sentinel-1 (radar)",
+        "Escena, mosaico y compuesto", "GOES y MODIS/VIIRS",
+        "Limitaciones y fuentes"])
+
+    with t1:
+        st.markdown(
+            """
+**Sensor óptico (Sentinel-2, Landsat).** Mide la luz solar reflejada por la
+superficie, en el espectro visible y el infrarrojo. Produce imágenes
+semejantes a una fotografía, fáciles de interpretar a simple vista. Requiere
+luz diurna y no atraviesa las nubes.
+
+**Sensor de radar (Sentinel-1).** Emite sus propias ondas de microondas y mide
+la fracción que regresa al satélite (retrodispersión). Funciona de día y de
+noche y atraviesa nubes y lluvia. La imagen no representa colores, sino la
+rugosidad, la humedad y la estructura de la superficie, por lo que exige una
+lectura distinta.
+
+| Aspecto | Óptico | Radar |
+|---|---|---|
+| Fuente de energía | Luz solar | Señal propia del satélite |
+| Nubes y lluvia | Las bloquean | Las atraviesa |
+| Día y noche | Solo de día | Ambos |
+| Qué mide | Color y reflectancia | Rugosidad, humedad y estructura |
+| Lectura | Intuitiva | Requiere conocimiento previo |
+| Uso principal | Cicatrices, cobertura, uso del suelo | Cambios bajo nubes, superficies expuestas |
+
+**Cuándo usar cada uno.** En Risaralda la nubosidad es frecuente, de modo que
+una escena óptica puede quedar parcial o cubierta. El radar garantiza una
+observación periódica; el óptico permite confirmar e interpretar lo observado.
+Lo recomendable es contrastar ambos.
+"""
+        )
+
+    with t2:
+        st.markdown(
+            """
+**Sentinel-2** (Programa Copernicus, ESA): resolución de 10 m en las bandas
+visibles e infrarrojo cercano y de 20 m en el infrarrojo de onda corta, con una
+revisita de unos 5 días.
+
+**Landsat 8 y 9** (USGS y NASA): resolución de 30 m, revisita de unos 8 días y
+registro histórico continuo desde 2013, útil para comparar fechas lejanas.
+
+**Visualizaciones disponibles**
+
+- **Color real:** bandas roja, verde y azul. Equivale a lo que percibiría el
+  ojo humano. Permite reconocer cicatrices de movimientos en masa, suelo
+  expuesto, cultivos, cuerpos de agua y nubes.
+- **Falso color de vegetación:** incorpora el infrarrojo cercano, que la
+  vegetación sana refleja con intensidad. La vegetación se ve en rojo; el suelo
+  desnudo y las cicatrices recientes, en tonos cian o grises.
+- **SWIR (infrarrojo de onda corta, solo Sentinel-2):** destaca la humedad del
+  suelo, la roca expuesta y las áreas quemadas.
+- **Nitidez de 15 m (solo Landsat en color real):** combina la imagen de 30 m
+  con la banda pancromática para aumentar el detalle visual. No incorpora
+  información nueva sobre la superficie.
+
+**Nubosidad máxima de escena.** Filtra las escenas por el porcentaje de nubes
+sobre toda la escena, no sobre el municipio. Una escena con poca nubosidad
+global puede tener nubes sobre la zona de interés, y a la inversa.
+
+**Cómo leer la imagen.** Las nubes aparecen en blanco y sus sombras en tono
+oscuro; no deben confundirse con cambios en el terreno. Para detectar un
+cambio real conviene comparar dos fechas con las mismas condiciones de
+iluminación y visualización.
+"""
+        )
+
+    with t3:
+        st.markdown(
+            """
+**Qué muestra la imagen.** Cada píxel indica la intensidad de la señal que
+regresa al satélite, expresada en decibelios (dB) y mostrada en escala de
+grises (de −22 dB, oscuro, a 0 dB, claro). La banda utilizada es la C, con
+longitud de onda cercana a 5,6 cm.
+
+**Cómo interpretar los tonos**
+
+- **Oscuro:** superficies lisas que desvían la señal lejos del satélite, como
+  agua en calma, vías pavimentadas o suelos muy húmedos y planos. También las
+  zonas de sombra de radar.
+- **Claro:** superficies rugosas o estructuras que devuelven mucha señal, como
+  zonas urbanas, bosque denso y laderas orientadas hacia el satélite.
+- **Cambios entre fechas:** un cambio marcado puede relacionarse con remoción
+  de vegetación o suelo, inundación o cambios de humedad. Requiere
+  verificación, porque la humedad y la lluvia también modifican la señal.
+
+**Polarización: VV y VH.** Indica la orientación de la onda emitida y la
+recibida. La primera letra corresponde a la emisión y la segunda a la
+recepción.
+
+- **VV (emite vertical, recibe vertical):** responde sobre todo a la rugosidad y
+  la humedad de la superficie. Es la polarización de referencia en esta
+  aplicación para detectar cambios en laderas.
+- **VH (emite vertical, recibe horizontal):** responde a la dispersión
+  múltiple dentro de la vegetación, por lo que resalta la estructura del dosel.
+  Es útil para diferenciar bosque de áreas abiertas.
+
+**Órbita ascendente y descendente.** Sentinel-1 recorre la órbita de sur a
+norte (ascendente) y de norte a sur (descendente), y en cada caso observa el
+terreno con un ángulo lateral distinto.
+
+- **Descendente:** pasa sobre Colombia en la mañana (cerca de las 6:00,
+  hora local) y observa hacia el occidente.
+- **Ascendente:** pasa en la tarde (cerca de las 18:00, hora local) y observa
+  hacia el oriente.
+
+En terreno montañoso esta diferencia es importante. Una ladera orientada hacia
+el satélite aparece comprimida y muy brillante, y una ladera opuesta puede
+quedar en sombra, con poca o ninguna información. Por eso una misma ladera se
+ve distinta en cada órbita, y **no deben compararse imágenes de órbita
+ascendente con imágenes de órbita descendente**. Para detectar cambios se
+comparan fechas de la misma órbita y la misma polarización.
+
+**Moteado (speckle).** El radar produce un aspecto granulado inherente a la
+técnica. No corresponde a objetos reales. Los mosaicos y compuestos lo
+atenúan.
+
+**Mayor análisis.** La página *Radar SAR* calcula el cambio entre períodos y la
+superficie con cambio fuerte sobre laderas.
+"""
+        )
+
+    with t4:
+        st.markdown(
+            """
+- **Escena individual:** una sola toma, de una fecha concreta. Es la imagen
+  original, pero cubre una franja limitada: una escena óptica puede incluir
+  nubes y una pasada de radar puede no abarcar todo el departamento.
+- **Mosaico:** une las tomas más recientes (30 días en óptico y 12 días en
+  radar) y conserva, en cada píxel, el valor más reciente. En óptico se omiten
+  los píxeles con nubes y sombras. En radar se une una sola dirección de órbita,
+  para mantener la comparabilidad. Permite cubrir todo el departamento, pero
+  **no corresponde a una fecha única**: distintas zonas de la imagen pueden
+  provenir de días diferentes.
+- **Compuesto mediano del rango:** calcula, para cada píxel, el valor central
+  de todas las tomas del rango de fechas elegido. Atenúa nubes, moteado y
+  valores extremos. Resulta útil para observar una condición típica, pero no
+  muestra un momento concreto.
+
+En Sentinel-2 y Landsat, la opción por defecto es la escena original más
+reciente; el mosaico es una opción adicional. En Sentinel-1, el mosaico
+descendente de 12 días es la opción por defecto, porque cubre toda la zona.
+"""
+        )
+
+    with t5:
+        st.markdown(
+            """
+**GOES-Este.** Satélite geoestacionario ubicado a 75° de longitud oeste. Observa
+de forma continua a Colombia y entrega una imagen cada 10 minutos. Su
+resolución, de uno a dos kilómetros, permite una vista regional y no
+municipal. Sirve para seguir la nubosidad y la convección que origina los
+aguaceros. El producto infrarrojo (C13) funciona de día y de noche; los
+productos visibles solo de día.
+
+**MODIS y VIIRS (NASA GIBS).** Una imagen diaria en color real por satélite,
+con resolución de 250 a 375 m. Se publica unas horas después del paso del
+satélite. Permite ver el estado de la nubosidad y del territorio del día, sin
+esperar a Sentinel o Landsat. Las franjas negras indican zonas no cubiertas por
+el paso diario.
+
+Estos productos describen condiciones atmosféricas y regionales. No tienen el
+detalle necesario para identificar movimientos en masa individuales.
+"""
+        )
+
+    with t6:
+        st.markdown(
+            """
+**Limitaciones**
+
+- Las imágenes son un apoyo para el conocimiento del riesgo; **no emiten
+  alertas** ni sustituyen la verificación en campo.
+- La nubosidad puede impedir el uso de las imágenes ópticas durante semanas.
+- La resolución limita el tamaño de lo detectable: un movimiento en masa
+  pequeño puede no ser visible en imágenes de 10 a 30 m.
+- Las imágenes se muestran sin corrección de relieve adicional; en laderas muy
+  pronunciadas, el radar presenta distorsiones geométricas.
+
+**Fuentes**
+
+- Sentinel-1 y Sentinel-2: Programa Copernicus, Agencia Espacial Europea (ESA).
+  Torres, R. et al. (2012), *GMES Sentinel-1 mission*, Remote Sensing of
+  Environment, 120, 9-24. Drusch, M. et al. (2012), *Sentinel-2: ESA's optical
+  high-resolution mission for GMES operational services*, Remote Sensing of
+  Environment, 120, 25-36.
+- Landsat 8 y 9, Colección 2 Nivel 2: Servicio Geológico de los Estados Unidos
+  (USGS) y NASA.
+- GOES-Este (GOES-R): NOAA y NASA.
+- MODIS y VIIRS: NASA, servicio GIBS (Worldview).
+- Procesamiento: Google Earth Engine (Gorelick et al., 2017).
+
+El listado completo se encuentra en la página *Fuentes y referencias*.
+"""
+        )
+
 if not conectar_gee():
     st.stop()
 
