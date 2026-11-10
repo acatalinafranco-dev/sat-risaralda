@@ -47,16 +47,16 @@ def generar_ficha(fila: dict, amenaza: dict, eventos_tipo: dict,
     logo = _logo_fondo_blanco()
     if logo:
         try:
-            c.drawImage(ImageReader(io.BytesIO(logo)), mx, y - 34, height=36,
-                        width=36, preserveAspectRatio=True, mask="auto")
+            c.drawImage(ImageReader(io.BytesIO(logo)), mx, y - 42, height=50,
+                        width=25, preserveAspectRatio=True, mask="auto")
         except Exception:  # noqa: BLE001
             pass
     c.setFillColor(VERDE)
     c.setFont("Helvetica-Bold", 10)
-    c.drawString(mx + 46, y - 8, DEPENDENCIA)
+    c.drawString(mx + 38, y - 8, DEPENDENCIA)
     c.setFillColor(GRIS)
     c.setFont("Helvetica", 9)
-    c.drawString(mx + 46, y - 21, ENTIDAD)
+    c.drawString(mx + 38, y - 21, ENTIDAD)
     c.setFont("Helvetica", 8.5)
     c.drawRightString(ancho - mx, y - 8,
                       f"Fecha de corte: {dt.date.today().strftime('%d/%m/%Y')}")
