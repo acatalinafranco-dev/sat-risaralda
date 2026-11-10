@@ -2,8 +2,7 @@
 
 Monitoreo satelital basado en productos de Google Earth Engine
 (hidrometeorología y cobertura vegetal) para el departamento de Risaralda y
-sus 14 municipios. Adaptación de la aplicación desarrollada por J. A. Alpala
-(UNGRD) para Pajarito, Boyacá.
+sus 14 municipios. 
 
 Ejecutar local:  streamlit run app.py
 """
@@ -272,7 +271,6 @@ st.markdown(
 st.caption(
     "Monitoreo Satelital de Movimientos en Masa · Risaralda · datos calculados "
     "en vivo desde Google Earth Engine sobre los polígonos DIVIPOLA (DANE). "
-    "Adaptación de la aplicación de J. A. Alpala (UNGRD)."
 )
 
 pie_institucional()
