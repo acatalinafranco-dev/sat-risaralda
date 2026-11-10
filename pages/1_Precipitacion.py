@@ -286,97 +286,94 @@ else:
 st.divider()
 st.markdown("### Climatología CHIRPS · promedio de los últimos 20 años")
 
-with st.expander("📖 Guía: qué es la climatología y para qué sirve", expanded=True):
-    g1, g2, g3, g4 = st.tabs(["¿Qué es?", "¿Para qué sirve?", "Cómo leer esta sección",
-                              "Límites"])
+with st.expander("📖 Guía: climatología de la precipitación (CHIRPS)", expanded=True):
+    g1, g2, g3, g4 = st.tabs(["Definición", "Utilidad y aplicaciones",
+                              "Interpretación", "Limitaciones"])
     with g1:
         st.markdown(
             """
-**La idea en una frase.** La climatología responde a la pregunta *¿cuánto
-llueve normalmente aquí, y en qué épocas?*
+**Definición.** La climatología de la precipitación describe el comportamiento
+promedio de la lluvia en un lugar: cuánto llueve en cada mes y en el año
+completo. Constituye la referencia de condiciones normales frente a la cual se
+evalúa la lluvia reciente.
 
-**De dónde sale.** Se toma la lluvia diaria de **CHIRPS**, un producto de la
-Universidad de California en Santa Bárbara que combina imágenes de satélite con
-datos de estaciones en tierra, disponible desde 1981. La aplicación promedia
-los **últimos 20 años** para cada mes y para el año completo.
+**Fuente y periodo.** Los valores provienen de CHIRPS (*Climate Hazards Group
+InfraRed Precipitation with Station data*), producto de la Universidad de
+California en Santa Bárbara que combina estimaciones satelitales con datos de
+estaciones en tierra, disponible desde 1981. La aplicación promedia los
+**últimos 20 años** para cada mes y para el año completo.
 
-**Qué muestra esta sección.**
+**Contenido de esta sección.**
 
-- **Gráfico de barras:** el promedio de lluvia de cada mes (en milímetros),
-  para la zona seleccionada. Permite ver qué meses suelen ser más lluviosos y
-  cuáles más secos.
-- **Cifra de precipitación media anual:** cuántos milímetros llueven en
-  promedio durante un año completo en la zona seleccionada.
-- **Mapa de media anual:** muestra cómo se reparte esa lluvia en el territorio.
-  Los tonos más oscuros indican zonas donde llueve más; los claros, donde llueve
-  menos.
-
-**En resumen.** La climatología es lo **normal** de la lluvia y sirve de
-punto de comparación para juzgar la lluvia de hoy.
+- **Gráfico de barras:** precipitación promedio mensual, en milímetros, de la
+  unidad de análisis seleccionada.
+- **Precipitación media anual:** acumulado promedio de un año completo.
+- **Mapa de media anual:** distribución espacial de esa precipitación. Los tonos
+  más oscuros corresponden a mayor precipitación.
 """
         )
     with g2:
         st.markdown(
             """
-**1. Saber si la lluvia reciente es normal o no.**
-La aplicación compara la lluvia de los últimos 30 días con el promedio de
-esos mismos días en 20 años. El resultado aparece como **«% de la normal»** en
-la página de inicio, en el comparativo de municipios y en las fichas
-municipales. Por ejemplo: 150 % significa que ha llovido una vez y media lo
-habitual para esa época.
+1. **Evaluación de la lluvia reciente.** La aplicación compara la precipitación
+   de los últimos 30 días (IMERG) con el promedio CHIRPS de los mismos días. El
+   resultado se presenta como **«% de la normal»** en la página de inicio, en el
+   comparativo municipal y en las fichas municipales. Un valor de 150 % indica
+   que la precipitación equivale a una vez y media la esperada para esa época.
+2. **Identificación de temporadas.** El gráfico mensual permite reconocer los
+   meses de mayor y menor precipitación y orientar el seguimiento de laderas,
+   las visitas de campo y las jornadas de prevención con las comunidades.
+3. **Caracterización territorial.** El mapa permite reconocer las zonas del
+   departamento con mayor precipitación histórica y priorizar en ellas el
+   seguimiento.
+4. **Contextualización de eventos.** Ante un movimiento en masa, permite
+   verificar si la precipitación del periodo fue excepcional o se ubicó dentro de
+   lo habitual, como insumo para informes técnicos y para los consejos de gestión
+   del riesgo.
+5. **Planificación.** Los promedios mensuales y anuales sustentan con
+   información la programación de actividades de conocimiento y reducción del
+   riesgo.
 
-**2. Conocer las temporadas lluviosas y secas.**
-El gráfico mensual muestra en qué meses suele llover más. Esto ayuda a
-anticipar las épocas en que conviene reforzar el seguimiento de las laderas y
-programar visitas de campo o jornadas de prevención con las comunidades.
-
-**3. Identificar las zonas más húmedas del departamento.**
-El mapa de media anual permite ver dónde llueve más, lo que ayuda a priorizar
-el seguimiento en las zonas donde la lluvia es históricamente mayor.
-
-**4. Poner un evento en contexto.**
-Si ocurrió un movimiento en masa, se puede revisar si el mes fue excepcional o
-estuvo dentro de lo habitual. Sirve para los informes técnicos y para explicar
-a la comunidad y a los consejos de gestión del riesgo qué ocurrió.
-
-**5. Sustentar decisiones de planificación.**
-Los promedios mensuales y anuales respaldan, con datos, la programación de
-actividades de conocimiento y reducción del riesgo.
-
-**¿Quién la puede usar?** Funcionarios de la CARDER, integrantes de los
-consejos municipales de gestión del riesgo (CMGRD) y cualquier persona que
-necesite entender el régimen de lluvias de su municipio.
+**Usuarios previstos:** funcionarios de la CARDER, consejos municipales y
+departamental de gestión del riesgo (CMGRD y CDGRD) y demás entidades que
+requieran caracterizar el régimen de lluvias.
 """
         )
     with g3:
         st.markdown(
             """
-- **Barras altas:** meses de mayor lluvia promedio. **Barras bajas:** meses más
-  secos. Revise cuántas temporadas lluviosas aparecen en el año: en la región
-  andina colombiana suelen ser dos.
-- **Cifra anual:** es un promedio del polígono seleccionado. Cambie el
-  municipio en la barra lateral para ver cómo varía entre municipios.
-- **Mapa:** compare las zonas oscuras y claras. No indica cuánto llovió esta
-  semana, sino cuánto llueve **en promedio en un año**.
-- **Pase el puntero** sobre un municipio para ver su nombre y su área cuando
-  tiene seleccionado «Todo Risaralda».
-- **Relación con las secciones de arriba:** las series y los mapas diarios
-  muestran lo que llovió **recientemente**; esta sección muestra lo que llueve
-  **normalmente**. Las dos juntas permiten saber si lo reciente es mucho o poco.
+- **Gráfico mensual.** Las barras más altas corresponden a los meses de mayor
+  precipitación promedio y las más bajas, a los meses más secos. Se recomienda
+  identificar cuántas temporadas lluviosas se presentan en el año; en la región
+  andina colombiana suelen ser dos, aspecto que debe verificarse en el gráfico
+  de cada municipio.
+- **Cifra anual.** Corresponde al promedio del polígono seleccionado. Al cambiar
+  el municipio en la barra lateral se aprecian las diferencias entre municipios.
+- **Mapa.** No representa la lluvia de la semana, sino la precipitación promedio
+  de un año.
+- **Nombre de los municipios.** Con «Todo Risaralda» seleccionado, al ubicar el
+  puntero sobre un municipio se muestran su nombre y su área.
+- **Lectura conjunta con las secciones anteriores.** Las series y los mapas
+  diarios muestran la precipitación reciente; esta sección muestra la
+  precipitación habitual. La comparación de ambas permite establecer si la lluvia
+  reciente es alta o baja respecto de lo esperado.
 """
         )
     with g4:
         st.markdown(
             """
-- **No es una predicción ni una alerta.** Describe lo que ha ocurrido en
-  promedio, no lo que va a ocurrir.
-- **Es una estimación satelital.** CHIRPS tiene celdas de unos 5 km. Describe
-  bien el patrón regional, pero no la lluvia exacta de una vereda o un sitio.
-- **Veinte años es un periodo corto.** Las normales climáticas oficiales se
-  calculan con 30 años y con estaciones, y las publica el IDEAM. Los valores de
-  esta página son **indicativos** y no sustituyen las normales del IDEAM.
-- **Años extremos.** Un año con El Niño o La Niña muy intensos puede mover el
-  promedio de 20 años. La climatología no separa estos años.
+- **No constituye una predicción ni una alerta.** Describe el comportamiento
+  promedio observado, no lo que ocurrirá.
+- **Estimación satelital.** CHIRPS tiene celdas de aproximadamente 5 km. Describe
+  adecuadamente el patrón regional, pero no la lluvia puntual de una vereda o un
+  sitio específico.
+- **Periodo de referencia.** Veinte años es un periodo menor a los 30 años que
+  la Organización Meteorológica Mundial establece para las normales climáticas.
+  Las normales oficiales son calculadas y publicadas por el IDEAM a partir de
+  estaciones. Los valores de esta sección son **indicativos** y no las sustituyen.
+- **Años extremos.** Los años con fenómeno de El Niño o La Niña de alta
+  intensidad pueden modificar el promedio de 20 años; la climatología no los
+  discrimina.
 - Herramienta de apoyo al conocimiento del riesgo: no sustituye las alertas
   oficiales del IDEAM ni las decisiones de los consejos de gestión del riesgo.
 """
