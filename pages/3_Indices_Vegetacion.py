@@ -27,7 +27,7 @@ st.set_page_config(page_title="Vegetación · SAT Risaralda", layout="wide",
 encabezado(
     "🌿 Índices de vegetación · {mun}",
     "Monitoreo de la cobertura vegetal con Sentinel-2 (máscara de nubes "
-    "Cloud Score+)**: "
+    "Cloud Score+): "
 )
 
 if not conectar_gee():
