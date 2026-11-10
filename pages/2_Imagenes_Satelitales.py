@@ -30,7 +30,7 @@ encabezado(
     "(cada 10 min) y **MODIS/VIIRS diario** (NASA GIBS).",
 )
 
-with st.expander("📖 Guía: cómo leer las imágenes satelitales y cuál sensor usar",
+with st.expander("📖 Guía de interpretación de imágenes ópticas y de radar",
                  expanded=False):
     st.markdown(
         "Esta página reúne imágenes de varios satélites. Cada uno observa la "
