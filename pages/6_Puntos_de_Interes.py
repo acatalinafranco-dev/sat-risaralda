@@ -56,7 +56,7 @@ pulsar el botón y toma de uno a varios minutos.
 | Cambio radar (dB) | Retrodispersión de la ventana reciente menos la de la referencia. Negativo: el terreno devuelve menos señal; positivo: más. Cambios de más de ±3 dB sobre ladera se destacan. |
 | Lluvia 7 d y 30 d (mm) | Acumulado satelital IMERG en el punto. |
 
-El cambio de radar es el mismo cálculo de la página *Radar SAR*.
+El cambio de radar es el mismo cálculo de la sección *Radar SAR* de Imágenes satelitales.
 """
         )
     with t3:
@@ -158,7 +158,7 @@ c1, c2 = st.columns(2)
 with c1:
     dias_rec = st.selectbox("Ventana reciente del radar", [12, 24, 36], index=1,
                             format_func=lambda d: f"últimos {d} días", key="pi_rec",
-                            help="Misma definición que en la página Radar SAR.")
+                            help="Misma definición que en la sección Radar SAR de Imágenes satelitales.")
 with c2:
     dias_ref = st.selectbox("Referencia del radar", [60, 90, 180], index=1,
                             format_func=lambda d: f"{d} días previos", key="pi_ref")
