@@ -96,6 +96,7 @@ c1, c2 = st.columns([1.4, 1])
 _CAPAS = [
     # (nombre de la capa, columna, color mínimo, color máximo, unidad, visible)
     ("Lluvia 30 d (% de la normal)", "pct_normal_30d", (222, 235, 247), (8, 81, 156), "%", True),
+    ("Lluvia 7 d (mm)", "lluvia_7d", (255, 255, 217), (8, 29, 88), "mm", False),
     ("Lluvia 30 d (mm)", "lluvia_30d", (229, 245, 249), (0, 109, 44), "mm", False),
     ("Área en amenaza alta y muy alta (%)", "alta_muy_alta", (254, 237, 222), (166, 54, 3), "%", False),
     ("Eventos SIMMA", "eventos", (242, 240, 247), (84, 39, 143), "", False),
@@ -157,6 +158,7 @@ with c1:
     for f in gj["features"]:
         d_ = _info.get(f["properties"]["codigo"], {})
         f["properties"]["lluvia"] = _txt(d_.get("pct_normal_30d"), "% de la normal")
+        f["properties"]["lluvia_7"] = _txt(d_.get("lluvia_7d"), "mm")
         f["properties"]["lluvia_mm"] = _txt(d_.get("lluvia_30d"), "mm")
         f["properties"]["amenaza"] = _txt(d_.get("alta_muy_alta"), "%")
         f["properties"]["eventos"] = str(int(d_.get("eventos", 0)))
@@ -167,9 +169,10 @@ with c1:
             "color": "#ffff00", "weight": 2, "fillColor": "#ffffff",
             "fillOpacity": 0.01},
         tooltip=folium.GeoJsonTooltip(
-            fields=["nombre", "lluvia", "lluvia_mm", "amenaza", "eventos",
+            fields=["nombre", "lluvia", "lluvia_7", "lluvia_mm", "amenaza", "eventos",
                     "perdida"],
-            aliases=["Municipio", "Lluvia 30 d", "Lluvia 30 d (acumulada)",
+            aliases=["Municipio", "Lluvia 30 d (% de la referencia)",
+                     "Lluvia 7 d (acumulada)", "Lluvia 30 d (acumulada)",
                      "Área en amenaza alta y muy alta", "Eventos SIMMA",
                      "Pérdida de vegetación"]),
     ).add_to(m)
@@ -178,7 +181,10 @@ with c1:
     m.to_streamlit(height=520)
     st.markdown("".join(leyendas), unsafe_allow_html=True)
     st.caption("Gris: sin dato. Con varias capas activas se superponen; "
-               "para leer una gama de colores conviene activar una a la vez.")
+               "para leer una gama de colores conviene activar una a la vez. «% de la "
+               "normal» es la lluvia de 30 días (IMERG) dividida por el promedio "
+               "de 20 años de CHIRPS para la misma ventana: referencia de apoyo, "
+               "no la normal oficial del IDEAM.")
 
 with c2:
     st.markdown("#### Resumen")
@@ -227,7 +233,8 @@ st.divider()
 st.markdown("#### Comparativo entre municipios")
 st.caption(
     "Lluvia acumulada (IMERG, media sobre el polígono), su relación con la "
-    "normal, amenaza del SGC, eventos del SIMMA y pérdida severa de vegetación "
+    "referencia climatológica (promedio de 20 años de CHIRPS para la misma "
+    "ventana de 30 días; no es la normal oficial del IDEAM), amenaza del SGC, eventos del SIMMA y pérdida severa de vegetación "
     "(ΔNDVI < −0,20 sobre zonas con NDVI > 0,4; Sentinel-2, últimos 60 días "
     "frente a hace 6–12 meses). Se actualiza cada día."
 )
