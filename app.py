@@ -271,7 +271,7 @@ with c1:
                      "Área en amenaza alta y muy alta", "Eventos SIMMA",
                      "Pérdida de vegetación"]),
     ).add_to(m)
-    folium.LayerControl(collapsed=False).add_to(m)
+    folium.LayerControl(collapsed=True).add_to(m)
     ajustar_al_municipio(m, margen=0.03)
     fg_clic = folium.FeatureGroup(name="Punto consultado", show=True)
     _clic = st.session_state.get("_clic")
