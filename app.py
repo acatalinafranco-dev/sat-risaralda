@@ -216,70 +216,63 @@ with c1:
         "Use el control de capas (esquina superior derecha del mapa) para "
         "encender o apagar cada variable. La división municipal permanece "
         "visible y muestra todos los valores al pasar el cursor.")
-    clave_mapa = (dt.date.today().isoformat(), codigo_activo(), len(res["filas"]))
-    if st.session_state.get("_mapa_clave") != clave_mapa:
-        m = mapa_base(zoom=9, basemap="SATELLITE")
-        leyendas = []
-        for nombre_c, col, c_min, c_max, uni, visible in _CAPAS:
-            vals = [d_[col] for d_ in _info.values()
-                    if d_.get(col) is not None and not pd.isna(d_[col])]
-            vmin, vmax = (min(vals), max(vals)) if vals else (0.0, 1.0)
-            gj = json.loads(json.dumps(geojson_municipios()))
-            for f in gj["features"]:
-                v = _info.get(f["properties"]["codigo"], {}).get(col)
-                if v is None or pd.isna(v):
-                    f["properties"]["color"] = "#b0b7bd"
-                else:
-                    t = 0.0 if vmax == vmin else (v - vmin) / (vmax - vmin)
-                    f["properties"]["color"] = _hex(_mezcla(c_min, c_max, t))
-            folium.GeoJson(
-                gj, name=nombre_c, show=visible,
-                style_function=lambda f: {
-                    "color": "#ffffff", "weight": 0.5,
-                    "fillColor": f["properties"]["color"], "fillOpacity": 0.6},
-            ).add_to(m)
-            leyendas.append(
-                f"<div style='display:flex;align-items:center;gap:8px;"
-                f"font-size:0.82rem;margin:2px 0'>"
-                f"<span style='flex:0 0 250px'>{nombre_c}</span>"
-                f"<span>{vmin:.0f}</span>"
-                f"<div style='flex:0 0 150px;height:10px;border-radius:5px;"
-                f"background:linear-gradient(to right,{_hex(c_min)},{_hex(c_max)})'>"
-                f"</div><span>{vmax:.0f} {uni}</span></div>")
-
-        # Mapa original de zonificación de amenaza del SGC, recortado al departamento
-        agregar_amenaza_sgc(m, geojson_municipios(), "risaralda")
-
-        # División municipal (siempre visible) con los valores de cada capa
+    m = mapa_base(zoom=9, basemap="SATELLITE")
+    leyendas = []
+    for nombre_c, col, c_min, c_max, uni, visible in _CAPAS:
+        vals = [d_[col] for d_ in _info.values()
+                if d_.get(col) is not None and not pd.isna(d_[col])]
+        vmin, vmax = (min(vals), max(vals)) if vals else (0.0, 1.0)
         gj = json.loads(json.dumps(geojson_municipios()))
         for f in gj["features"]:
-            d_ = _info.get(f["properties"]["codigo"], {})
-            f["properties"]["lluvia"] = _txt(d_.get("pct_normal_30d"), "% de la normal")
-            f["properties"]["lluvia_7"] = _txt(d_.get("lluvia_7d"), "mm")
-            f["properties"]["lluvia_mm"] = _txt(d_.get("lluvia_30d"), "mm")
-            f["properties"]["amenaza"] = _txt(d_.get("alta_muy_alta"), "%")
-            f["properties"]["eventos"] = str(int(d_.get("eventos", 0)))
-            f["properties"]["perdida"] = _txt(d_.get("perdida_ha"), "ha")
+            v = _info.get(f["properties"]["codigo"], {}).get(col)
+            if v is None or pd.isna(v):
+                f["properties"]["color"] = "#b0b7bd"
+            else:
+                t = 0.0 if vmax == vmin else (v - vmin) / (vmax - vmin)
+                f["properties"]["color"] = _hex(_mezcla(c_min, c_max, t))
         folium.GeoJson(
-            gj, name="División municipal",
+            gj, name=nombre_c, show=visible,
             style_function=lambda f: {
-                "color": "#ffff00", "weight": 2, "fillColor": "#ffffff",
-                "fillOpacity": 0.01},
-            tooltip=folium.GeoJsonTooltip(
-                fields=["nombre", "lluvia", "lluvia_7", "lluvia_mm", "amenaza", "eventos",
-                        "perdida"],
-                aliases=["Municipio", "Lluvia 30 d (% de la referencia)",
-                         "Lluvia 7 d (acumulada)", "Lluvia 30 d (acumulada)",
-                         "Área en amenaza alta y muy alta", "Eventos SIMMA",
-                         "Pérdida de vegetación"]),
+                "color": "#ffffff", "weight": 0.5,
+                "fillColor": f["properties"]["color"], "fillOpacity": 0.6},
         ).add_to(m)
-        folium.LayerControl(collapsed=False).add_to(m)
-        ajustar_al_municipio(m, margen=0.03)
-        st.session_state["_mapa_inicio"] = m
-        st.session_state["_mapa_leyendas"] = leyendas
-        st.session_state["_mapa_clave"] = clave_mapa
-    m = st.session_state["_mapa_inicio"]
-    leyendas = st.session_state["_mapa_leyendas"]
+        leyendas.append(
+            f"<div style='display:flex;align-items:center;gap:8px;"
+            f"font-size:0.82rem;margin:2px 0'>"
+            f"<span style='flex:0 0 250px'>{nombre_c}</span>"
+            f"<span>{vmin:.0f}</span>"
+            f"<div style='flex:0 0 150px;height:10px;border-radius:5px;"
+            f"background:linear-gradient(to right,{_hex(c_min)},{_hex(c_max)})'>"
+            f"</div><span>{vmax:.0f} {uni}</span></div>")
+
+    # Mapa original de zonificación de amenaza del SGC, recortado al departamento
+    agregar_amenaza_sgc(m, geojson_municipios(), "risaralda")
+
+    # División municipal (siempre visible) con los valores de cada capa
+    gj = json.loads(json.dumps(geojson_municipios()))
+    for f in gj["features"]:
+        d_ = _info.get(f["properties"]["codigo"], {})
+        f["properties"]["lluvia"] = _txt(d_.get("pct_normal_30d"), "% de la normal")
+        f["properties"]["lluvia_7"] = _txt(d_.get("lluvia_7d"), "mm")
+        f["properties"]["lluvia_mm"] = _txt(d_.get("lluvia_30d"), "mm")
+        f["properties"]["amenaza"] = _txt(d_.get("alta_muy_alta"), "%")
+        f["properties"]["eventos"] = str(int(d_.get("eventos", 0)))
+        f["properties"]["perdida"] = _txt(d_.get("perdida_ha"), "ha")
+    folium.GeoJson(
+        gj, name="División municipal",
+        style_function=lambda f: {
+            "color": "#ffff00", "weight": 2, "fillColor": "#ffffff",
+            "fillOpacity": 0.01},
+        tooltip=folium.GeoJsonTooltip(
+            fields=["nombre", "lluvia", "lluvia_7", "lluvia_mm", "amenaza", "eventos",
+                    "perdida"],
+            aliases=["Municipio", "Lluvia 30 d (% de la referencia)",
+                     "Lluvia 7 d (acumulada)", "Lluvia 30 d (acumulada)",
+                     "Área en amenaza alta y muy alta", "Eventos SIMMA",
+                     "Pérdida de vegetación"]),
+    ).add_to(m)
+    folium.LayerControl(collapsed=False).add_to(m)
+    ajustar_al_municipio(m, margen=0.03)
     fg_clic = folium.FeatureGroup(name="Punto consultado", show=True)
     _clic = st.session_state.get("_clic")
     if _clic:
