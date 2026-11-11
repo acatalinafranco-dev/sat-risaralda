@@ -278,6 +278,85 @@ def agregar_municipios(m: leafmap.Map) -> None:
     ).add_to(m)
 
 
+URL_AMENAZA_SGC = (
+    "https://geoportal.sgc.gov.co/arcgis/rest/services/SIMMA/"
+    "ZonificacionAmenazaCache/MapServer/export"
+)
+
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def _png_amenaza_sgc(clave: str, _gj: dict, borde: tuple) -> bytes | None:
+    """Imagen del mapa de amenaza del SGC recortada al polígono `_gj`
+    (fuera del polígono queda transparente). None si el servicio no responde."""
+    import math
+
+    import requests
+    from PIL import Image, ImageChops, ImageDraw
+
+    la0, lo0, la1, lo1 = borde
+
+    def merc(lon, lat):
+        return (lon * 20037508.342789244 / 180.0,
+                math.log(math.tan(math.pi / 4 + math.radians(lat) / 2))
+                * 6378137.0)
+
+    x0, y0 = merc(lo0, la0)
+    x1, y1 = merc(lo1, la1)
+    ancho = 1200
+    alto = max(200, int(ancho * (y1 - y0) / (x1 - x0)))
+    try:
+        r = requests.get(URL_AMENAZA_SGC, params={
+            "bbox": f"{x0},{y0},{x1},{y1}", "bboxSR": 3857, "imageSR": 3857,
+            "size": f"{ancho},{alto}", "format": "png32",
+            "transparent": "true", "f": "image"}, timeout=60)
+        if r.status_code != 200 or "image" not in r.headers.get(
+                "content-type", ""):
+            return None
+        img = Image.open(io.BytesIO(r.content)).convert("RGBA")
+    except Exception:
+        return None
+    mascara = Image.new("L", img.size, 0)
+    dib = ImageDraw.Draw(mascara)
+
+    def px(anillo):
+        pts = []
+        for c in anillo:
+            x, y = merc(c[0], c[1])
+            pts.append(((x - x0) / (x1 - x0) * img.size[0],
+                        (y1 - y) / (y1 - y0) * img.size[1]))
+        return pts
+
+    for f in _gj["features"]:
+        g = f["geometry"]
+        polis = (g["coordinates"] if g["type"] == "MultiPolygon"
+                 else [g["coordinates"]])
+        for poli in polis:
+            for k, anillo in enumerate(poli):
+                dib.polygon(px(anillo), fill=255 if k == 0 else 0)
+    img.putalpha(ImageChops.multiply(img.getchannel("A"), mascara))
+    buf = io.BytesIO()
+    img.save(buf, "PNG", optimize=True)
+    return buf.getvalue()
+
+
+def agregar_amenaza_sgc(m, gj: dict, clave: str, visible: bool = False) -> bool:
+    """Capa del mapa de amenaza del SGC recortada al área de interés."""
+    from .gee_session import _bounds_de
+
+    (la0, lo0), (la1, lo1) = _bounds_de(gj)
+    borde = (la0 - 0.01, lo0 - 0.01, la1 + 0.01, lo1 + 0.01)
+    png = _png_amenaza_sgc(clave, gj, borde)
+    if png is None:
+        return False
+    folium.raster_layers.ImageOverlay(
+        image="data:image/png;base64," + base64.b64encode(png).decode(),
+        bounds=[[borde[0], borde[1]], [borde[2], borde[3]]],
+        name="Amenaza SGC (mapa original)", opacity=0.75, show=visible,
+        overlay=True, control=True,
+    ).add_to(m)
+    return True
+
+
 def ajustar_al_municipio(m: leafmap.Map, margen: float = 0.03) -> None:
     (la0, lo0), (la1, lo1) = bounds_municipio()
     m.fit_bounds([[la0 - margen, lo0 - margen], [la1 + margen, lo1 + margen]])
