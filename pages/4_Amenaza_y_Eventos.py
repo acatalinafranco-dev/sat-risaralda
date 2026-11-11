@@ -19,8 +19,10 @@ import streamlit as st
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from src import gee_terreno as gt
 from src import riesgo
-from src.gee_session import codigo_activo, es_departamento, nombre_activo
-from src.ui import (VERDE_CARDER, agregar_contorno, agregar_municipios,
+from src.gee_session import (codigo_activo, es_departamento, geojson_municipio,
+                            nombre_activo)
+from src.ui import (VERDE_CARDER, agregar_amenaza_sgc, agregar_contorno,
+                    agregar_municipios,
                     ajustar_al_municipio, cache_mun, conectar_gee, encabezado,
                     leyenda_continua, mapa_base, pie_institucional)
 
@@ -73,13 +75,15 @@ def _pendiente_stats():
 # 1) Mapa
 # --------------------------------------------------------------------------
 st.markdown("### Mapa de relieve, susceptibilidad y eventos")
-c1, c2, c3 = st.columns([1.3, 1, 1])
+c1, c2, c3, c4 = st.columns([1.3, 1, 1, 1])
 with c1:
     capa_dem = st.selectbox("Relieve (DEM NASADEM 30 m)",
                             ["Ninguno"] + list(gt.CAPAS), index=1)
 with c2:
     ver_sus = st.checkbox("Susceptibilidad SGC (1:100.000)", value=False)
 with c3:
+    ver_am = st.checkbox("Amenaza SGC (recortada)", value=False)
+with c4:
     ver_ev = st.checkbox("Eventos SIMMA", value=True)
 
 tipos_sel: list[str] = []
@@ -112,6 +116,12 @@ if ver_sus:
         name="Susceptibilidad SGC", overlay=True, control=True,
         opacity=0.6, max_native_zoom=14, max_zoom=19,
     ).add_to(m)
+
+if ver_am:
+    if not agregar_amenaza_sgc(m, geojson_municipio(), codigo_activo(),
+                               visible=True):
+        st.warning("No fue posible obtener el mapa de amenaza del SGC en "
+                   "este momento; intente de nuevo más tarde.")
 
 if es_departamento():
     agregar_municipios(m)
@@ -155,6 +165,11 @@ with l2:
             "<span style='font-size:0.8rem'>(menor → mayor)</span>",
             unsafe_allow_html=True)
 with l3:
+    if ver_am:
+        st.markdown(
+            "**Amenaza SGC**<br><span style='font-size:0.8rem'>Categorías de muy "
+            "baja a muy alta, según la leyenda del SGC; recortada al área de "
+            "análisis.</span>", unsafe_allow_html=True)
     if ver_ev:
         chips = " ".join(
             f"<span style='color:{riesgo.COLOR_TIPO.get(t, '#555')}'>●</span> {t}"
