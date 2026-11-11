@@ -93,58 +93,92 @@ _info = df.set_index("codigo").to_dict("index")
 # --- Mapa por municipio + resumen -----------------------------------------
 c1, c2 = st.columns([1.4, 1])
 
-_VARIABLES = {
-    "Lluvia 30 d (% de la normal)": "pct_normal_30d",
-    "Área en amenaza alta y muy alta (%)": "alta_muy_alta",
-    "Eventos SIMMA": "eventos",
-}
+_CAPAS = [
+    # (nombre de la capa, columna, color mínimo, color máximo, unidad, visible)
+    ("Lluvia 30 d (% de la normal)", "pct_normal_30d", (222, 235, 247), (8, 81, 156), "%", True),
+    ("Lluvia 30 d (mm)", "lluvia_30d", (229, 245, 249), (0, 109, 44), "mm", False),
+    ("Área en amenaza alta y muy alta (%)", "alta_muy_alta", (254, 237, 222), (166, 54, 3), "%", False),
+    ("Eventos SIMMA", "eventos", (242, 240, 247), (84, 39, 143), "", False),
+    ("Pérdida de vegetación (ha)", "perdida_ha", (254, 227, 145), (102, 37, 6), "ha", False),
+]
+
+
+def _hex(rgb):
+    return "#%02x%02x%02x" % tuple(int(x) for x in rgb)
+
+
+def _mezcla(a, b, t):
+    return tuple(a[k] + t * (b[k] - a[k]) for k in range(3))
+
+
+def _txt(v, unidad):
+    if v is None or pd.isna(v):
+        return "s/d"
+    return f"{v:.0f} {unidad}".strip()
+
 
 with c1:
     st.markdown("#### Mapa por municipio")
-    var = st.radio("Variable del mapa", list(_VARIABLES), horizontal=True,
-                   key="mapa_var")
-    clave = _VARIABLES[var]
-    vals = [d_[clave] for d_ in _info.values()
-            if d_.get(clave) is not None and not pd.isna(d_[clave])]
-    vmin, vmax = (min(vals), max(vals)) if vals else (0.0, 1.0)
+    st.caption(
+        "Use el control de capas (esquina superior derecha del mapa) para "
+        "encender o apagar cada variable. La división municipal permanece "
+        "visible y muestra todos los valores al pasar el cursor.")
+    m = mapa_base(zoom=9, basemap="SATELLITE")
+    leyendas = []
+    for nombre_c, col, c_min, c_max, uni, visible in _CAPAS:
+        vals = [d_[col] for d_ in _info.values()
+                if d_.get(col) is not None and not pd.isna(d_[col])]
+        vmin, vmax = (min(vals), max(vals)) if vals else (0.0, 1.0)
+        gj = json.loads(json.dumps(geojson_municipios()))
+        for f in gj["features"]:
+            v = _info.get(f["properties"]["codigo"], {}).get(col)
+            if v is None or pd.isna(v):
+                f["properties"]["color"] = "#b0b7bd"
+            else:
+                t = 0.0 if vmax == vmin else (v - vmin) / (vmax - vmin)
+                f["properties"]["color"] = _hex(_mezcla(c_min, c_max, t))
+        folium.GeoJson(
+            gj, name=nombre_c, show=visible,
+            style_function=lambda f: {
+                "color": "#ffffff", "weight": 0.5,
+                "fillColor": f["properties"]["color"], "fillOpacity": 0.6},
+        ).add_to(m)
+        leyendas.append(
+            f"<div style='display:flex;align-items:center;gap:8px;"
+            f"font-size:0.82rem;margin:2px 0'>"
+            f"<span style='flex:0 0 250px'>{nombre_c}</span>"
+            f"<span>{vmin:.0f}</span>"
+            f"<div style='flex:0 0 150px;height:10px;border-radius:5px;"
+            f"background:linear-gradient(to right,{_hex(c_min)},{_hex(c_max)})'>"
+            f"</div><span>{vmax:.0f} {uni}</span></div>")
 
-    def _color(v):
-        if v is None or pd.isna(v):
-            return "#b0b7bd"
-        t = 0.0 if vmax == vmin else (v - vmin) / (vmax - vmin)
-        a, b = (222, 235, 247), (8, 81, 156)
-        return "#%02x%02x%02x" % tuple(int(a[i] + t * (b[i] - a[i])) for i in range(3))
-
+    # División municipal (siempre visible) con los valores de cada capa
     gj = json.loads(json.dumps(geojson_municipios()))
     for f in gj["features"]:
         d_ = _info.get(f["properties"]["codigo"], {})
-        pn = d_.get("pct_normal_30d")
-        f["properties"]["lluvia"] = ("s/d" if pn is None or pd.isna(pn)
-                                     else f"{pn:.0f} % de la normal")
-        f["properties"]["amenaza"] = f"{d_.get('alta_muy_alta', 0):.0f} %"
+        f["properties"]["lluvia"] = _txt(d_.get("pct_normal_30d"), "% de la normal")
+        f["properties"]["lluvia_mm"] = _txt(d_.get("lluvia_30d"), "mm")
+        f["properties"]["amenaza"] = _txt(d_.get("alta_muy_alta"), "%")
         f["properties"]["eventos"] = str(int(d_.get("eventos", 0)))
-        f["properties"]["color"] = _color(d_.get(clave))
-    m = mapa_base(zoom=9, basemap="SATELLITE")
+        f["properties"]["perdida"] = _txt(d_.get("perdida_ha"), "ha")
     folium.GeoJson(
-        gj, name=var,
+        gj, name="División municipal",
         style_function=lambda f: {
-            "color": "#ffffff", "weight": 1.5,
-            "fillColor": f["properties"]["color"], "fillOpacity": 0.6,
-        },
+            "color": "#ffff00", "weight": 2, "fillColor": "#ffffff",
+            "fillOpacity": 0.01},
         tooltip=folium.GeoJsonTooltip(
-            fields=["nombre", "lluvia", "amenaza", "eventos"],
-            aliases=["Municipio", "Lluvia 30 d",
-                     "Área en amenaza alta y muy alta", "Eventos SIMMA"]),
+            fields=["nombre", "lluvia", "lluvia_mm", "amenaza", "eventos",
+                    "perdida"],
+            aliases=["Municipio", "Lluvia 30 d", "Lluvia 30 d (acumulada)",
+                     "Área en amenaza alta y muy alta", "Eventos SIMMA",
+                     "Pérdida de vegetación"]),
     ).add_to(m)
+    folium.LayerControl(collapsed=False).add_to(m)
     ajustar_al_municipio(m, margen=0.03)
-    m.to_streamlit(height=470)
-    st.markdown(
-        f"<div style='display:flex;align-items:center;gap:8px;font-size:0.85rem'>"
-        f"<span>{vmin:.0f}</span>"
-        f"<div style='flex:0 0 220px;height:12px;border-radius:6px;"
-        f"background:linear-gradient(to right,#deebf7,#08519c)'></div>"
-        f"<span>{vmax:.0f}</span><span style='color:#666'>· {var}</span></div>",
-        unsafe_allow_html=True)
+    m.to_streamlit(height=520)
+    st.markdown("".join(leyendas), unsafe_allow_html=True)
+    st.caption("Gris: sin dato. Con varias capas activas se superponen; "
+               "para leer una gama de colores conviene activar una a la vez.")
 
 with c2:
     st.markdown("#### Resumen")
