@@ -159,7 +159,7 @@ comparan fechas de la misma órbita y la misma polarización.
 técnica. No corresponde a objetos reales. Los mosaicos y compuestos lo
 atenúan.
 
-**Mayor análisis.** La página *Radar SAR* calcula el cambio entre períodos y la
+**Mayor análisis.** La sección *Radar SAR*, de esta misma página, calcula el cambio entre períodos y la
 superficie con cambio fuerte sobre laderas.
 """
         )
