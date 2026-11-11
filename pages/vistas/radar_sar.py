@@ -113,7 +113,7 @@ suelo por lluvias recientes, crecimiento de cultivos y presencia de agua.
         st.markdown(
             """
 - **No confirma movimientos en masa.** Prioriza laderas para contrastar con
-  la página *Imágenes satelitales* (óptico), los eventos del SIMMA y la
+  la sección *Catálogo de imágenes* (óptico), los eventos del SIMMA y la
   verificación en campo.
 - **Distorsiones de ladera.** En pendientes muy inclinadas frente al satélite
   la imagen de radar se deforma (acortamiento, inversión y sombra). Por eso
