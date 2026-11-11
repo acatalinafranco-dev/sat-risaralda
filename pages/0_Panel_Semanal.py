@@ -183,7 +183,7 @@ st.caption("El número de escenas puede incluir varias por día y por trayectori
 st.markdown("#### Cambio reciente en radar por municipio")
 st.caption("Cálculo bajo demanda: compara los últimos 24 días de Sentinel-1 con "
            "los 90 días previos y mide la superficie con cambio fuerte sobre "
-           "laderas. Es el mismo cálculo de la página *Radar SAR*.")
+           "laderas. Es el mismo cálculo de la sección *Radar SAR* de Imágenes satelitales.")
 
 
 @st.cache_data(ttl=21600, show_spinner=False)
