@@ -589,10 +589,10 @@ if sensor == "Comparar dos fechas (deslizador)":
         m = mapa_base(zoom=12, basemap="Esri.WorldImagery")
         capa_a = folium.TileLayer(
             tiles=res_a["tiles_url"], attr="Google Earth Engine / Copernicus / USGS",
-            name="Imagen A", overlay=True, control=False)
+            name="Imagen A", overlay=True, control=False, zIndex=500)
         capa_b = folium.TileLayer(
             tiles=res_b["tiles_url"], attr="Google Earth Engine / Copernicus / USGS",
-            name="Imagen B", overlay=True, control=False)
+            name="Imagen B", overlay=True, control=False, zIndex=500)
         capa_a.add_to(m)
         capa_b.add_to(m)
         SideBySideLayers(layer_left=capa_a, layer_right=capa_b).add_to(m)
