@@ -99,7 +99,6 @@ _CAPAS = [
     ("Lluvia 30 d (% de la normal)", "pct_normal_30d", (222, 235, 247), (8, 81, 156), "%", True),
     ("Lluvia 7 d (mm)", "lluvia_7d", (255, 255, 217), (8, 29, 88), "mm", False),
     ("Lluvia 30 d (mm)", "lluvia_30d", (229, 245, 249), (0, 109, 44), "mm", False),
-    ("Área en amenaza alta y muy alta (%)", "alta_muy_alta", (254, 237, 222), (166, 54, 3), "%", False),
     ("Eventos SIMMA", "eventos", (242, 240, 247), (84, 39, 143), "", False),
     ("Pérdida de vegetación (ha)", "perdida_ha", (254, 227, 145), (102, 37, 6), "ha", False),
 ]
@@ -189,7 +188,7 @@ with c1:
         "movimientos en masa publicada por el Servicio Geológico Colombiano "
         "(geoportal.sgc.gov.co), con sus categorías de muy baja a muy alta, "
         "recortada al departamento; se consulta en línea y es independiente de "
-        "la capa de porcentaje por municipio.")
+        "la tabla de porcentaje por municipio.")
     st.caption("Gris: sin dato. Con varias capas activas se superponen; "
                "para leer una gama de colores conviene activar una a la vez. «% de la "
                "normal» es la lluvia de 30 días (IMERG) dividida por el promedio "
