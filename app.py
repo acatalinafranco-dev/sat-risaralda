@@ -19,7 +19,8 @@ from src.gee_comparativo import tabla_comparativa
 from src import riesgo
 from src.gee_session import geojson_municipios, nombre_activo
 from src.ui import (DEPENDENCIA, ENTIDAD, GRADIENTE, VERDE_CARDER,
-                    agregar_municipios, ajustar_al_municipio,
+                    agregar_amenaza_sgc, agregar_municipios,
+                    ajustar_al_municipio,
                     branding_institucional, conectar_gee, mapa_base,
                     pie_institucional)
 
@@ -153,14 +154,8 @@ with c1:
             f"background:linear-gradient(to right,{_hex(c_min)},{_hex(c_max)})'>"
             f"</div><span>{vmax:.0f} {uni}</span></div>")
 
-    # Mapa original de zonificación de amenaza del SGC (teselas en línea)
-    folium.TileLayer(
-        tiles=("https://geoportal.sgc.gov.co/arcgis/rest/services/SIMMA/"
-               "ZonificacionAmenazaCache/MapServer/tile/{z}/{y}/{x}"),
-        attr="Servicio Geológico Colombiano (SGC)",
-        name="Amenaza SGC (mapa original)", overlay=True, control=True,
-        show=False, opacity=0.75, max_zoom=19,
-    ).add_to(m)
+    # Mapa original de zonificación de amenaza del SGC, recortado al departamento
+    agregar_amenaza_sgc(m, geojson_municipios(), "risaralda")
 
     # División municipal (siempre visible) con los valores de cada capa
     gj = json.loads(json.dumps(geojson_municipios()))
@@ -192,9 +187,9 @@ with c1:
     st.caption(
         "«Amenaza SGC (mapa original)» muestra la zonificación de amenaza por "
         "movimientos en masa publicada por el Servicio Geológico Colombiano "
-        "(geoportal.sgc.gov.co), con sus categorías de muy baja a muy alta; se "
-        "consulta en línea y es independiente de la capa de porcentaje por "
-        "municipio.")
+        "(geoportal.sgc.gov.co), con sus categorías de muy baja a muy alta, "
+        "recortada al departamento; se consulta en línea y es independiente de "
+        "la capa de porcentaje por municipio.")
     st.caption("Gris: sin dato. Con varias capas activas se superponen; "
                "para leer una gama de colores conviene activar una a la vez. «% de la "
                "normal» es la lluvia de 30 días (IMERG) dividida por el promedio "
