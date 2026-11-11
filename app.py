@@ -10,14 +10,18 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import math
 
 import folium
 import pandas as pd
 import streamlit as st
+from streamlit_folium import st_folium
 
 from src.gee_comparativo import tabla_comparativa
+from src import interactivo as itv
 from src import riesgo
-from src.gee_session import geojson_municipios, nombre_activo
+from src.ficha import generar_ficha
+from src.gee_session import codigo_activo, geojson_municipios, nombre_activo
 from src.ui import (DEPENDENCIA, ENTIDAD, GRADIENTE, VERDE_CARDER,
                     agregar_amenaza_sgc, agregar_municipios,
                     ajustar_al_municipio,
@@ -118,70 +122,175 @@ def _txt(v, unidad):
     return f"{v:.0f} {unidad}".strip()
 
 
+_FILAS = {f["codigo"]: f for f in res["filas"]}
+_NOM = {c: i["nombre"] for c, i in _info.items()}
+
+
+def _pdf_ficha(cod: str) -> bytes | None:
+    """Ficha PDF de un municipio (None si aún no hay indicadores de GEE)."""
+    fila = _FILAS.get(cod)
+    if fila is None:
+        return None
+    a = riesgo.amenaza_municipal().set_index("codigo").loc[cod].to_dict()
+    p = riesgo.puntos_simma(cod)
+    return generar_ficha(fila, a, p["tipo"].value_counts().to_dict(),
+                         int((p["origen"] == "Inventario").sum()))
+
+
+def _abrir_ficha(cod: str) -> None:
+    st.session_state["mun_codigo"] = cod
+    st.switch_page("pages/5_Ficha_Municipal.py")
+
+
+@st.cache_data(ttl=21600, show_spinner=False)
+def _png_tematico(capa: str, fecha: str, valores: dict, unidad: str,
+                  c_min: tuple, c_max: tuple) -> bytes:
+    return itv.mapa_png(valores, f"Risaralda · {capa}", unidad, c_min, c_max)
+
+
+def _panel_clic(lat: float, lon: float) -> None:
+    mun = itv.municipio_en(lat, lon)
+    if mun is None:
+        st.info("El punto queda fuera de Risaralda. Haga clic dentro del "
+                "departamento.")
+        return
+    cod = mun["codigo"]
+    d_ = _info.get(cod, {})
+    nivel = riesgo.nivel_atencion(d_.get("pct_normal_30d"), d_.get("alta_muy_alta"))
+    st.markdown(f"**📍 {mun['nombre']}** · {lat:.4f}, {lon:.4f}")
+    st.markdown(
+        f"<div style='font-size:0.86rem;line-height:1.5'>"
+        f"<b>Municipio</b><br>"
+        f"Lluvia 30 d: {_txt(d_.get('pct_normal_30d'), '% de la referencia')} "
+        f"({_txt(d_.get('lluvia_30d'), 'mm')}) · 7 d: {_txt(d_.get('lluvia_7d'), 'mm')}<br>"
+        f"Área en amenaza alta y muy alta: {_txt(d_.get('alta_muy_alta'), '%')}<br>"
+        f"Eventos SIMMA: {int(d_.get('eventos', 0))} · Pérdida de vegetación: "
+        f"{_txt(d_.get('perdida_ha'), 'ha')}<br>"
+        f"Nivel de atención provisional: <b style='color:"
+        f"{riesgo.COLOR_NIVEL.get(nivel, '#555')}'>{nivel}</b></div>",
+        unsafe_allow_html=True)
+    am = itv.amenaza_en_punto(round(lat, 4), round(lon, 4))
+    ev = itv.evento_cercano(lat, lon)
+    pt = {"valores": {}, "error": None}
+    if conectado:
+        with st.spinner("Consultando el punto..."):
+            pt = itv.datos_punto(round(lat, 4), round(lon, 4),
+                                 dt.date.today().isoformat())
+    v = pt["valores"]
+    filas = [("Amenaza SGC en el punto",
+              f"{am['categoria']} (escala {am['escala']})" if am else "s/d")]
+    filas.append(("Lluvia 30 d en el punto",
+                  "s/d" if v.get("l30") is None else
+                  f"{v['l30']:.0f} mm" + ("" if v.get("pct") is None
+                                          else f" ({v['pct']:.0f} % de la referencia)")))
+    filas.append(("Lluvia 7 d en el punto",
+                  "s/d" if v.get("l7") is None else f"{v['l7']:.0f} mm"))
+    filas.append(("Cota", "s/d" if v.get("elev") is None else f"{v['elev']:.0f} m s. n. m."))
+    filas.append(("Pendiente", "s/d" if v.get("pend") is None else
+                  f"{v['pend']:.0f}° ({math.tan(math.radians(v['pend'])) * 100:.0f} %)"))
+    filas.append(("Evento SIMMA más cercano",
+                  "s/d" if ev is None else
+                  f"{ev['tipo']} ({ev['origen'].lower()}), a {ev['km']:.1f} km"))
+    st.markdown("**Punto consultado**")
+    st.dataframe(pd.DataFrame(filas, columns=["Variable", "Valor"]),
+                 hide_index=True, use_container_width=True)
+    if pt["error"]:
+        st.caption("No fue posible calcular parte de las variables del punto.")
+    st.caption("Lluvia: IMERG (≈11 km) y referencia CHIRPS de 20 años; pendiente y "
+               "cota: NASADEM (30 m); amenaza: servicio del SGC. Son valores "
+               "indicativos de apoyo.")
+    b1, b2 = st.columns(2)
+    b1.button("Abrir la ficha", on_click=_abrir_ficha, args=(cod,),
+              use_container_width=True)
+    pdf = _pdf_ficha(cod)
+    if pdf:
+        b2.download_button("Ficha (PDF)", pdf, mime="application/pdf",
+                           file_name=f"ficha_{mun['nombre'].lower().replace(' ', '_')}_"
+                                     f"{dt.date.today().isoformat()}.pdf",
+                           use_container_width=True)
+
+
 with c1:
     st.markdown("#### Mapa por municipio")
     st.caption(
         "Use el control de capas (esquina superior derecha del mapa) para "
         "encender o apagar cada variable. La división municipal permanece "
         "visible y muestra todos los valores al pasar el cursor.")
-    m = mapa_base(zoom=9, basemap="SATELLITE")
-    leyendas = []
-    for nombre_c, col, c_min, c_max, uni, visible in _CAPAS:
-        vals = [d_[col] for d_ in _info.values()
-                if d_.get(col) is not None and not pd.isna(d_[col])]
-        vmin, vmax = (min(vals), max(vals)) if vals else (0.0, 1.0)
+    clave_mapa = (dt.date.today().isoformat(), codigo_activo(), len(res["filas"]))
+    if st.session_state.get("_mapa_clave") != clave_mapa:
+        m = mapa_base(zoom=9, basemap="SATELLITE")
+        leyendas = []
+        for nombre_c, col, c_min, c_max, uni, visible in _CAPAS:
+            vals = [d_[col] for d_ in _info.values()
+                    if d_.get(col) is not None and not pd.isna(d_[col])]
+            vmin, vmax = (min(vals), max(vals)) if vals else (0.0, 1.0)
+            gj = json.loads(json.dumps(geojson_municipios()))
+            for f in gj["features"]:
+                v = _info.get(f["properties"]["codigo"], {}).get(col)
+                if v is None or pd.isna(v):
+                    f["properties"]["color"] = "#b0b7bd"
+                else:
+                    t = 0.0 if vmax == vmin else (v - vmin) / (vmax - vmin)
+                    f["properties"]["color"] = _hex(_mezcla(c_min, c_max, t))
+            folium.GeoJson(
+                gj, name=nombre_c, show=visible,
+                style_function=lambda f: {
+                    "color": "#ffffff", "weight": 0.5,
+                    "fillColor": f["properties"]["color"], "fillOpacity": 0.6},
+            ).add_to(m)
+            leyendas.append(
+                f"<div style='display:flex;align-items:center;gap:8px;"
+                f"font-size:0.82rem;margin:2px 0'>"
+                f"<span style='flex:0 0 250px'>{nombre_c}</span>"
+                f"<span>{vmin:.0f}</span>"
+                f"<div style='flex:0 0 150px;height:10px;border-radius:5px;"
+                f"background:linear-gradient(to right,{_hex(c_min)},{_hex(c_max)})'>"
+                f"</div><span>{vmax:.0f} {uni}</span></div>")
+
+        # Mapa original de zonificación de amenaza del SGC, recortado al departamento
+        agregar_amenaza_sgc(m, geojson_municipios(), "risaralda")
+
+        # División municipal (siempre visible) con los valores de cada capa
         gj = json.loads(json.dumps(geojson_municipios()))
         for f in gj["features"]:
-            v = _info.get(f["properties"]["codigo"], {}).get(col)
-            if v is None or pd.isna(v):
-                f["properties"]["color"] = "#b0b7bd"
-            else:
-                t = 0.0 if vmax == vmin else (v - vmin) / (vmax - vmin)
-                f["properties"]["color"] = _hex(_mezcla(c_min, c_max, t))
+            d_ = _info.get(f["properties"]["codigo"], {})
+            f["properties"]["lluvia"] = _txt(d_.get("pct_normal_30d"), "% de la normal")
+            f["properties"]["lluvia_7"] = _txt(d_.get("lluvia_7d"), "mm")
+            f["properties"]["lluvia_mm"] = _txt(d_.get("lluvia_30d"), "mm")
+            f["properties"]["amenaza"] = _txt(d_.get("alta_muy_alta"), "%")
+            f["properties"]["eventos"] = str(int(d_.get("eventos", 0)))
+            f["properties"]["perdida"] = _txt(d_.get("perdida_ha"), "ha")
         folium.GeoJson(
-            gj, name=nombre_c, show=visible,
+            gj, name="División municipal",
             style_function=lambda f: {
-                "color": "#ffffff", "weight": 0.5,
-                "fillColor": f["properties"]["color"], "fillOpacity": 0.6},
+                "color": "#ffff00", "weight": 2, "fillColor": "#ffffff",
+                "fillOpacity": 0.01},
+            tooltip=folium.GeoJsonTooltip(
+                fields=["nombre", "lluvia", "lluvia_7", "lluvia_mm", "amenaza", "eventos",
+                        "perdida"],
+                aliases=["Municipio", "Lluvia 30 d (% de la referencia)",
+                         "Lluvia 7 d (acumulada)", "Lluvia 30 d (acumulada)",
+                         "Área en amenaza alta y muy alta", "Eventos SIMMA",
+                         "Pérdida de vegetación"]),
         ).add_to(m)
-        leyendas.append(
-            f"<div style='display:flex;align-items:center;gap:8px;"
-            f"font-size:0.82rem;margin:2px 0'>"
-            f"<span style='flex:0 0 250px'>{nombre_c}</span>"
-            f"<span>{vmin:.0f}</span>"
-            f"<div style='flex:0 0 150px;height:10px;border-radius:5px;"
-            f"background:linear-gradient(to right,{_hex(c_min)},{_hex(c_max)})'>"
-            f"</div><span>{vmax:.0f} {uni}</span></div>")
-
-    # Mapa original de zonificación de amenaza del SGC, recortado al departamento
-    agregar_amenaza_sgc(m, geojson_municipios(), "risaralda")
-
-    # División municipal (siempre visible) con los valores de cada capa
-    gj = json.loads(json.dumps(geojson_municipios()))
-    for f in gj["features"]:
-        d_ = _info.get(f["properties"]["codigo"], {})
-        f["properties"]["lluvia"] = _txt(d_.get("pct_normal_30d"), "% de la normal")
-        f["properties"]["lluvia_7"] = _txt(d_.get("lluvia_7d"), "mm")
-        f["properties"]["lluvia_mm"] = _txt(d_.get("lluvia_30d"), "mm")
-        f["properties"]["amenaza"] = _txt(d_.get("alta_muy_alta"), "%")
-        f["properties"]["eventos"] = str(int(d_.get("eventos", 0)))
-        f["properties"]["perdida"] = _txt(d_.get("perdida_ha"), "ha")
-    folium.GeoJson(
-        gj, name="División municipal",
-        style_function=lambda f: {
-            "color": "#ffff00", "weight": 2, "fillColor": "#ffffff",
-            "fillOpacity": 0.01},
-        tooltip=folium.GeoJsonTooltip(
-            fields=["nombre", "lluvia", "lluvia_7", "lluvia_mm", "amenaza", "eventos",
-                    "perdida"],
-            aliases=["Municipio", "Lluvia 30 d (% de la referencia)",
-                     "Lluvia 7 d (acumulada)", "Lluvia 30 d (acumulada)",
-                     "Área en amenaza alta y muy alta", "Eventos SIMMA",
-                     "Pérdida de vegetación"]),
-    ).add_to(m)
-    folium.LayerControl(collapsed=False).add_to(m)
-    ajustar_al_municipio(m, margen=0.03)
-    m.to_streamlit(height=520)
+        folium.LayerControl(collapsed=False).add_to(m)
+        ajustar_al_municipio(m, margen=0.03)
+        st.session_state["_mapa_inicio"] = m
+        st.session_state["_mapa_leyendas"] = leyendas
+        st.session_state["_mapa_clave"] = clave_mapa
+    m = st.session_state["_mapa_inicio"]
+    leyendas = st.session_state["_mapa_leyendas"]
+    fg_clic = folium.FeatureGroup(name="Punto consultado", show=True)
+    _clic = st.session_state.get("_clic")
+    if _clic:
+        folium.Marker(list(_clic), icon=folium.Icon(color="red", icon="info-sign")).add_to(fg_clic)
+    salida = st_folium(m, height=520, use_container_width=True, key="mapa_inicio",
+                       returned_objects=["last_clicked"], feature_group_to_add=fg_clic)
+    if salida and salida.get("last_clicked"):
+        _nuevo = (round(salida["last_clicked"]["lat"], 5), round(salida["last_clicked"]["lng"], 5))
+        if _nuevo != st.session_state.get("_clic"):
+            st.session_state["_clic"] = _nuevo
+            st.rerun()
     st.markdown("".join(leyendas), unsafe_allow_html=True)
     st.caption(
         "«Amenaza SGC (mapa original)» muestra la zonificación de amenaza por "
@@ -195,7 +304,42 @@ with c1:
                "de 20 años de CHIRPS para la misma ventana: referencia de apoyo, "
                "no la normal oficial del IDEAM.")
 
+    with st.expander("📥 Exportar lo que se está viendo"):
+        x1, x2, x3 = st.columns(3)
+        capa_x = x1.selectbox("Capa del mapa", [c[0] for c in _CAPAS], key="capa_exp")
+        _, col_x, cmin_x, cmax_x, uni_x, _ = next(c for c in _CAPAS if c[0] == capa_x)
+        x1.download_button(
+            "Mapa temático (PNG)",
+            _png_tematico(capa_x, dt.date.today().isoformat(),
+                          {c: (None if pd.isna(i.get(col_x)) else float(i[col_x]))
+                           for c, i in _info.items()}, uni_x, cmin_x, cmax_x),
+            file_name=f"mapa_{col_x}_{dt.date.today().isoformat()}.png",
+            mime="image/png", use_container_width=True)
+        _clic_m = itv.municipio_en(*st.session_state["_clic"]) if st.session_state.get("_clic") else None
+        _cods = list(_NOM)
+        _def = _cods.index(_clic_m["codigo"]) if _clic_m else 0
+        cod_x = x3.selectbox("Municipio de la ficha", _cods, index=_def,
+                             format_func=lambda c: _NOM[c], key="mun_exp")
+        _pdf_x = _pdf_ficha(cod_x)
+        if _pdf_x:
+            x3.download_button("Ficha municipal (PDF)", _pdf_x,
+                               file_name=f"ficha_{_NOM[cod_x].lower().replace(' ', '_')}_"
+                                         f"{dt.date.today().isoformat()}.pdf",
+                               mime="application/pdf", use_container_width=True)
+        x2.caption("La tabla comparativa y el semáforo se descargan en Excel "
+                   "más abajo en esta página.")
+        st.caption("Los archivos incluyen la fecha de corte y la cita institucional.")
+
 with c2:
+    st.markdown("#### Consulta por clic")
+    _c = st.session_state.get("_clic")
+    if _c:
+        _panel_clic(*_c)
+    else:
+        st.caption("Haga clic en cualquier punto del mapa para ver el resumen "
+                   "del municipio y los datos de ese punto: amenaza del SGC, "
+                   "lluvia, pendiente y evento más cercano.")
+    st.divider()
     st.markdown("#### Resumen")
     st.caption(f"Fecha de corte: {dt.date.today().strftime('%d/%m/%Y')} · "
                f"Unidad de análisis: **{nombre_activo()}**")
@@ -289,6 +433,18 @@ st.download_button(
     file_name=f"comparativo_risaralda_{dt.date.today().isoformat()}.csv",
     mime="text/csv",
 )
+st.download_button(
+    "Descargar tabla (Excel)",
+    itv.excel_bytes({"Comparativo": tabla}, [
+        "Lluvia: IMERG V07 (acumulado 7 y 30 días) frente al promedio de 20 años de "
+        "CHIRPS para la misma ventana; es una referencia de apoyo, no la normal oficial del IDEAM.",
+        "Amenaza: Mapa Nacional de Amenaza por Movimientos en Masa, SGC (2015, 1:100.000).",
+        f"Eventos: SIMMA del SGC (descarga del {riesgo.fecha_corte_sgc()}).",
+        "Pérdida de vegetación: ΔNDVI < −0,20 sobre zonas con NDVI > 0,4, Sentinel-2.",
+        "Los valores son indicativos y no sustituyen las alertas oficiales."]),
+    file_name=f"comparativo_risaralda_{dt.date.today().isoformat()}.xlsx",
+    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+)
 st.caption(
     "Los valores son indicativos: IMERG tiene píxeles de ~11 km, por lo que en "
     "municipios pequeños (La Virginia, Dosquebradas) la lluvia refleja el campo "
@@ -297,6 +453,101 @@ st.caption(
     f"{riesgo.fecha_corte_sgc()}). La pérdida de vegetación debe verificarse "
     "contra la imagen en color real antes de cualquier decisión."
 )
+
+st.divider()
+st.markdown("#### Semáforo de atención con umbrales ajustables")
+st.caption(
+    "Cada municipio recibe de 0 a 3 puntos por la lluvia de 30 días (frente a la "
+    "referencia de 20 años) y de 0 a 3 puntos por la proporción de su área en "
+    "amenaza alta y muy alta; la suma define el nivel. Los umbrales de partida son "
+    "provisionales: mueva los controles para ver cómo cambia el orden de los "
+    "municipios y calibre el criterio con el SGC, el IDEAM y el inventario de "
+    "eventos. No es un nivel de alerta oficial.")
+_DEF = {"ul1": 100, "ul2": 130, "ul3": 170, "ua1": 30, "ua2": 60, "ua3": 80,
+        "cm": 3, "ca": 5}
+for _k, _v in _DEF.items():
+    st.session_state.setdefault(_k, _v)
+
+
+def _reset_umbrales() -> None:
+    for _k, _v in _DEF.items():
+        st.session_state[_k] = _v
+
+
+sc1, sc2, sc3 = st.columns(3)
+with sc1:
+    st.markdown("**Lluvia 30 d (% de la referencia)**")
+    st.slider("Suma 1 punto desde", 50, 300, key="ul1")
+    st.slider("Suma 2 puntos desde", 50, 300, key="ul2")
+    st.slider("Suma 3 puntos desde", 50, 300, key="ul3")
+with sc2:
+    st.markdown("**Área en amenaza alta y muy alta (%)**")
+    st.slider("Suma 1 punto desde ", 0, 100, key="ua1")
+    st.slider("Suma 2 puntos desde ", 0, 100, key="ua2")
+    st.slider("Suma 3 puntos desde ", 0, 100, key="ua3")
+with sc3:
+    st.markdown("**Nivel según la suma (0 a 6)**")
+    st.slider("Moderado desde", 1, 6, key="cm")
+    st.slider("Alto desde", 2, 6, key="ca")
+    st.button("Restablecer umbrales de partida", on_click=_reset_umbrales)
+
+_ul = tuple(sorted((st.session_state["ul1"], st.session_state["ul2"], st.session_state["ul3"])))
+_ua = tuple(sorted((st.session_state["ua1"], st.session_state["ua2"], st.session_state["ua3"])))
+_cm = st.session_state["cm"]
+_ca = max(st.session_state["ca"], _cm + 1)
+_cortes = (_cm - 1, _ca - 1)
+
+_filas_sem = []
+for _, r in df.iterrows():
+    pl = itv._puntos(r["pct_normal_30d"], _ul)
+    pa = itv._puntos(r["alta_muy_alta"], _ua)
+    n_aj = itv.nivel_con_umbrales(r["pct_normal_30d"], r["alta_muy_alta"], _ul, _ua, _cortes)
+    n_df = riesgo.nivel_atencion(None if pd.isna(r["pct_normal_30d"]) else r["pct_normal_30d"],
+                                 r["alta_muy_alta"])
+    orden_n = {"Bajo": 0, "Moderado": 1, "Alto": 2}
+    cambio = "="
+    if n_aj in orden_n and n_df in orden_n and n_aj != n_df:
+        cambio = "↑ sube" if orden_n[n_aj] > orden_n[n_df] else "↓ baja"
+    _filas_sem.append({
+        "Municipio": r["nombre"], "Lluvia 30 d (% ref.)": r["pct_normal_30d"],
+        "Amenaza alta y muy alta (%)": r["alta_muy_alta"],
+        "Puntos lluvia": pl, "Puntos amenaza": pa,
+        "Suma": None if pl is None or pa is None else pl + pa,
+        "Nivel ajustado": n_aj, "Nivel de partida": n_df, "Cambio": cambio})
+sem = pd.DataFrame(_filas_sem).sort_values(
+    ["Suma", "Lluvia 30 d (% ref.)"], ascending=False, na_position="last")
+
+mk1, mk2, mk3 = st.columns(3)
+for _col, _n in zip((mk1, mk2, mk3), ("Alto", "Moderado", "Bajo")):
+    _a, _b = int((sem["Nivel ajustado"] == _n).sum()), int((sem["Nivel de partida"] == _n).sum())
+    _col.metric(f"Municipios en nivel {_n.lower()}", _a, delta=f"{_a - _b:+d} frente a los umbrales de partida",
+                delta_color="off")
+
+
+def _color_nivel(v):
+    c = riesgo.COLOR_NIVEL.get(v)
+    return "" if c is None else f"background-color:{c};color:{'#000' if v == 'Moderado' else '#fff'}"
+
+
+st.dataframe(
+    sem.style.map(_color_nivel, subset=["Nivel ajustado", "Nivel de partida"]).format(
+        {"Lluvia 30 d (% ref.)": "{:.0f}", "Amenaza alta y muy alta (%)": "{:.0f}",
+         "Puntos lluvia": "{:.0f}", "Puntos amenaza": "{:.0f}", "Suma": "{:.0f}"},
+        na_rep="s/d"),
+    hide_index=True, use_container_width=True)
+_umb = pd.DataFrame([
+    {"Parámetro": "Lluvia 30 d: 1, 2 y 3 puntos desde (% de la referencia)", "Valor": " / ".join(map(str, _ul))},
+    {"Parámetro": "Amenaza alta y muy alta: 1, 2 y 3 puntos desde (%)", "Valor": " / ".join(map(str, _ua))},
+    {"Parámetro": "Nivel moderado desde (suma)", "Valor": _cortes[0] + 1},
+    {"Parámetro": "Nivel alto desde (suma)", "Valor": _cortes[1] + 1}])
+st.download_button(
+    "Descargar semáforo (Excel)",
+    itv.excel_bytes({"Semáforo": sem, "Umbrales": _umb}, [
+        "Nivel de atención provisional: no es un nivel de alerta oficial.",
+        "Cada variable aporta de 0 a 3 puntos (uno por umbral superado); la suma define el nivel.",
+        "Los umbrales de partida (100/130/170 % y 30/60/80 %) deben validarse con el SGC, el IDEAM y el inventario de eventos de CARDER."]),
+    file_name=f"semaforo_risaralda_{dt.date.today().isoformat()}.xlsx",
+    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 st.divider()
 
