@@ -153,6 +153,15 @@ with c1:
             f"background:linear-gradient(to right,{_hex(c_min)},{_hex(c_max)})'>"
             f"</div><span>{vmax:.0f} {uni}</span></div>")
 
+    # Mapa original de zonificación de amenaza del SGC (teselas en línea)
+    folium.TileLayer(
+        tiles=("https://geoportal.sgc.gov.co/arcgis/rest/services/SIMMA/"
+               "ZonificacionAmenazaCache/MapServer/tile/{z}/{y}/{x}"),
+        attr="Servicio Geológico Colombiano (SGC)",
+        name="Amenaza SGC (mapa original)", overlay=True, control=True,
+        show=False, opacity=0.75, max_zoom=19,
+    ).add_to(m)
+
     # División municipal (siempre visible) con los valores de cada capa
     gj = json.loads(json.dumps(geojson_municipios()))
     for f in gj["features"]:
@@ -180,6 +189,12 @@ with c1:
     ajustar_al_municipio(m, margen=0.03)
     m.to_streamlit(height=520)
     st.markdown("".join(leyendas), unsafe_allow_html=True)
+    st.caption(
+        "«Amenaza SGC (mapa original)» muestra la zonificación de amenaza por "
+        "movimientos en masa publicada por el Servicio Geológico Colombiano "
+        "(geoportal.sgc.gov.co), con sus categorías de muy baja a muy alta; se "
+        "consulta en línea y es independiente de la capa de porcentaje por "
+        "municipio.")
     st.caption("Gris: sin dato. Con varias capas activas se superponen; "
                "para leer una gama de colores conviene activar una a la vez. «% de la "
                "normal» es la lluvia de 30 días (IMERG) dividida por el promedio "
