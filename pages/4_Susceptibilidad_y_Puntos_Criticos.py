@@ -138,8 +138,8 @@ for i, r in pts[pts["nivel"].isin(niveles)].iterrows():
         tooltip=f"{r['vereda'] or 's/d'} · {r['nivel']}").add_to(fg)
 fg.add_to(m)
 folium.LayerControl(collapsed=True).add_to(m)
-m.fit_bounds([[la0, lo0], [la1, lo1]])
-st_folium(m, height=560, use_container_width=True, key="mapa_susc", returned_objects=[])
+st_folium(m, height=560, use_container_width=True, key="mapa_susc", returned_objects=[],
+          center=[(la0 + la1) / 2, (lo0 + lo1) / 2], zoom=9 if es_departamento() else 11)
 
 ley = " ".join(
     f"<span style='display:inline-block;width:14px;height:14px;background:{sus.COLOR_CLASE[k]};"
