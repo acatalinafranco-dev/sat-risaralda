@@ -109,7 +109,7 @@
    "Muy baja": 3.5,
    "Baja": 10.4,
    "Media": 16.1,
-   "Alta": 22.0,
+   "Alta": 22,
    "Muy alta": 47.9
   },
   "pct_area_por_clase": {
@@ -154,7 +154,36 @@
   "Es de escala regional (30 m): no reemplaza los estudios básicos ni detallados del POT (Decreto 1077 de 2015)."
  ],
  "formula_indice": "Índice de atención = 100 x (0,35 susceptibilidad en validación cruzada + 0,25 prioridad de campo + 0,25 exposición + 0,15 actividad). Prioritario >= 65 o prioridad de campo crítica o alta; seguimiento 45-64; vigilancia < 45.",
+ "umbral_lluvia": {
+  "estado": "preliminar",
+  "acum7_mm": 63,
+  "acum30_mm": 257,
+  "metodo": "295 eventos del CDGRD con fecha del proceso confiable (2017-2026) frente a 1.180 fechas al azar en los mismos sitios. Lluvia CHIRPS (5 km) en el punto. 7 días: mejor separación (TSS 0,21) con 63 mm; 30 días: 257 mm, percentil 75 de las fechas sin evento.",
+  "desempeno": "La lluvia acumulada separa poco por sí sola (AUC 0,61 a 7 y 30 días): la mitad de los eventos ocurrió con 63 mm o más en 7 días, frente a 29 % de los días sin evento. Se recalibrará con más eventos y con estaciones.",
+  "eventos_mediana": {
+   "7d": 62.7,
+   "30d": 240.5
+  },
+  "control_mediana": {
+   "7d": 44.4,
+   "30d": 199.6
+  }
+ },
  "area_por_clase": {
+  "66": {
+   "Muy baja": 35.5,
+   "Baja": 26.9,
+   "Media": 18.6,
+   "Alta": 11.2,
+   "Muy alta": 7.7
+  },
+  "66001": {
+   "Muy baja": 30.1,
+   "Baja": 32.6,
+   "Media": 17.5,
+   "Alta": 11.9,
+   "Muy alta": 7.9
+  },
   "66045": {
    "Muy baja": 32.4,
    "Baja": 29.2,
@@ -218,13 +247,6 @@
    "Alta": 5.3,
    "Muy alta": 3.2
   },
-  "66001": {
-   "Muy baja": 30.1,
-   "Baja": 32.6,
-   "Media": 17.5,
-   "Alta": 11.9,
-   "Muy alta": 7.9
-  },
   "66572": {
    "Muy baja": 65.5,
    "Baja": 18.8,
@@ -252,16 +274,21 @@
    "Media": 14.3,
    "Alta": 8.7,
    "Muy alta": 9.1
-  },
-  "66": {
-   "Muy baja": 35.5,
-   "Baja": 26.9,
-   "Media": 18.6,
-   "Alta": 11.2,
-   "Muy alta": 7.7
   }
  },
  "visitas_por_anio": {
+  "66": {
+   "2017": 44,
+   "2018": 53,
+   "2019": 46,
+   "2020": 11,
+   "2021": 114,
+   "2022": 166,
+   "2023": 107,
+   "2024": 79,
+   "2025": 123,
+   "2026": 221
+  },
   "66001": {
    "2017": 3,
    "2019": 5,
@@ -412,18 +439,6 @@
    "2024": 5,
    "2025": 8,
    "2026": 1
-  },
-  "66": {
-   "2017": 44,
-   "2018": 53,
-   "2019": 46,
-   "2020": 11,
-   "2021": 114,
-   "2022": 166,
-   "2023": 107,
-   "2024": 79,
-   "2025": 123,
-   "2026": 221
   }
  },
  "raster": {
