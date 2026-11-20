@@ -139,7 +139,7 @@ def _pdf_ficha(cod: str) -> bytes | None:
 
 def _abrir_ficha(cod: str) -> None:
     st.session_state["mun_codigo"] = cod
-    st.switch_page("pages/5_Ficha_Municipal.py")
+    st.switch_page("pages/5_Reporte_Municipal.py")
 
 
 @st.cache_data(ttl=21600, show_spinner=False)
@@ -200,11 +200,11 @@ def _panel_clic(lat: float, lon: float) -> None:
                "cota: NASADEM (30 m); amenaza: servicio del SGC. Son valores "
                "indicativos de apoyo.")
     b1, b2 = st.columns(2)
-    b1.button("Abrir la ficha", on_click=_abrir_ficha, args=(cod,),
+    b1.button("Abrir el reporte municipal", on_click=_abrir_ficha, args=(cod,),
               use_container_width=True)
     pdf = _pdf_ficha(cod)
     if pdf:
-        b2.download_button("Ficha (PDF)", pdf, mime="application/pdf",
+        b2.download_button("Ficha rápida de indicadores (PDF)", pdf, mime="application/pdf",
                            file_name=f"ficha_{mun['nombre'].lower().replace(' ', '_')}_"
                                      f"{dt.date.today().isoformat()}.pdf",
                            use_container_width=True)
@@ -315,7 +315,7 @@ with c1:
                              format_func=lambda c: _NOM[c], key="mun_exp")
         _pdf_x = _pdf_ficha(cod_x)
         if _pdf_x:
-            x3.download_button("Ficha municipal (PDF)", _pdf_x,
+            x3.download_button("Ficha rápida de indicadores (PDF)", _pdf_x,
                                file_name=f"ficha_{_NOM[cod_x].lower().replace(' ', '_')}_"
                                          f"{dt.date.today().isoformat()}.pdf",
                                mime="application/pdf", use_container_width=True)
