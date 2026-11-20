@@ -217,7 +217,8 @@ def figura_mapa(geom_mun: dict, otros: list[dict], pts: pd.DataFrame,
     return _png(fig), asp
 
 
-def figura_lluvia(serie: list[dict], ref30: float | None) -> ImageReader:
+def figura_lluvia(serie: list[dict], ref30: float | None,
+                  umbral30: float | None = None) -> ImageReader:
     df = pd.DataFrame(serie)
     fig, ax = plt.subplots(figsize=(3.9, 1.9))
     if len(df):
@@ -233,10 +234,13 @@ def figura_lluvia(serie: list[dict], ref30: float | None) -> ImageReader:
         if ref30:
             ax2.axhline(ref30, color="#e6550d", lw=1.1, ls="--",
                         label="Referencia 30 días (CHIRPS, 20 años)")
+        if umbral30:
+            ax2.axhline(umbral30, color="#c0392b", lw=1.1, ls=":",
+                        label=f"Umbral preliminar 30 días ({umbral30:.0f} mm)")
         ax2.set_ylabel("Acumulado 30 d (mm)", fontsize=6.5)
         ax2.tick_params(labelsize=6)
         ax2.legend(fontsize=5.8, loc="upper left", frameon=False)
-        ax2.set_ylim(0, max(acum30.max(), ref30 or 0) * 1.25 + 1)
+        ax2.set_ylim(0, max(acum30.max(), ref30 or 0, umbral30 or 0) * 1.3 + 1)
     ax.set_ylabel("mm/día", fontsize=6.5)
     ax.tick_params(labelsize=6)
     ax.xaxis.set_major_formatter(matplotlib.dates.DateFormatter("%d/%m"))
@@ -311,6 +315,29 @@ def _tabla(c, x, y, cols, filas, anchos, tam=7, alto_f=12.5, cabecera=True):
     return y
 
 
+def _supera_umbral(m, lluvia) -> list[str]:
+    u = m.get("umbral_lluvia") or {}
+    if not lluvia or not u:
+        return []
+    sup = []
+    if (lluvia.get("acum7") or 0) >= u["acum7_mm"]:
+        sup.append(f"7 días ({lluvia['acum7']:.0f} mm frente a {u['acum7_mm']} mm)")
+    if (lluvia.get("acum30") or 0) >= u["acum30_mm"]:
+        sup.append(f"30 días ({lluvia['acum30']:.0f} mm frente a {u['acum30_mm']} mm)")
+    return sup
+
+
+def _texto_umbral(m, lluvia) -> str:
+    u = m.get("umbral_lluvia") or {}
+    if not u:
+        return ""
+    sup = _supera_umbral(m, lluvia)
+    t = (f"Umbral preliminar de lluvia, calibrado con los eventos del CDGRD: {u['acum7_mm']} mm "
+         f"en 7 días o {u['acum30_mm']} mm en 30 días. ")
+    t += ("Hoy se supera en " + " y ".join(sup) + ". ") if sup else "Hoy no se supera. "
+    return t + u["desempeno"]
+
+
 def _mensaje(nombre, res, pts, lluvia, cambio) -> str:
     np_ = res["por_nivel"]["Seguimiento prioritario"]
     t = (f"{nombre} registra {res['n_sitios']} sitios con movimiento en masa "
@@ -328,6 +355,11 @@ def _mensaje(nombre, res, pts, lluvia, cambio) -> str:
         estado = ("por encima" if p >= 115 else "por debajo" if p <= 85 else "cerca")
         t += (f"La lluvia de los últimos 30 días equivale al {p:.0f} % de la "
               f"referencia histórica ({estado} de lo habitual). ")
+    sup = _supera_umbral(sus.meta(), lluvia)
+    if sup:
+        t += ("La lluvia acumulada supera el umbral preliminar de "
+              + " y ".join(sup) + ": conviene reforzar el seguimiento de los sitios "
+              "priorizados. ")
     if cambio and cambio.get("n_zonas"):
         t += (f"El monitoreo satelital identifica {cambio['n_zonas']} zonas con "
               "cambios recientes compatibles con movimientos en masa, que conviene "
@@ -434,7 +466,8 @@ def generar_reporte(codigo: str, nombre: str, geom_mun: dict, otros: list[dict],
     y2 = _titulo_seccion(c, "Lluvia y antecedentes", MX, y)
     if lluvia and lluvia.get("serie"):
         c.drawImage(figura_lluvia(lluvia.get("serie_completa") or lluvia["serie"],
-                                  lluvia.get("ref30")), MX, y2 - 140,
+                                  lluvia.get("ref30"), (m.get("umbral_lluvia") or {}).get("acum30_mm")),
+                    MX, y2 - 140,
                     width=300, height=140, preserveAspectRatio=True, anchor="nw")
     c.drawImage(figura_visitas(m.get("visitas_por_anio", {}).get(codigo, {})),
                 MX + 310, y2 - 140, width=UTIL - 310, height=140,
@@ -444,8 +477,7 @@ def generar_reporte(codigo: str, nombre: str, geom_mun: dict, otros: list[dict],
         y = _parrafo(c, f"Lluvia acumulada: {_n(lluvia.get('acum7'))} mm en 7 días y "
                         f"{_n(lluvia.get('acum30'))} mm en 30 días (NASA GPM IMERG). "
                         f"Referencia de 30 días: {_n(lluvia.get('ref30'))} mm (promedio "
-                        "CHIRPS 20 años de la misma ventana). Umbral de lluvia detonante "
-                        "en calibración con las fechas del inventario CDGRD.",
+                        "CHIRPS 20 años de la misma ventana). " + _texto_umbral(m, lluvia),
                      MX, y, UTIL, tam=7.2, interlin=9)
     y -= 6
     # Cambio de cobertura y señal satelital
