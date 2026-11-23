@@ -19,9 +19,9 @@ from src.ui import (ESRI_IMAGERY_ATTR, ESRI_IMAGERY_URL, GRADIENTE, VERDE_CARDER
 
 encabezado(
     "🗓️ Esta semana · {mun}",
-    "Resumen para decidir **dónde hacer seguimiento**: cuánto ha llovido, qué sectores "
+    "Reporte informativo: resumen para decidir en**dónde hacer seguimiento**, cuánto ha llovido, qué sectores "
     "reúnen condiciones que favorecen movimientos en masa y qué sitios conocidos "
-    "requieren atención. **Es un reporte informativo; no es una alerta.**",
+    "requieren atención.",
 )
 
 if not conectar_gee():
@@ -147,7 +147,7 @@ st.markdown("")
 # --------------------------------------------------------------------------
 cm, cd = st.columns([3, 2])
 with cm:
-    st.markdown("#### 🗺️ Dónde mirar esta semana")
+    st.markdown("#### 🗺️ Mapa de seguimiento")
     (la0, lo0), (la1, lo1) = bounds_municipio()
     m = folium.Map(location=[(la0 + la1) / 2, (lo0 + lo1) / 2], zoom_start=10 if not es_departamento() else 9,
                    tiles=None, control_scale=True)
@@ -179,14 +179,14 @@ with cm:
         unsafe_allow_html=True)
 
 with cd:
-    st.markdown("#### ✅ Qué hacer")
+    st.markdown("#### ✅ ¿Qué hacer?")
     pasos = [
         ("1", "Revisar los sectores en rojo", "Empezar por los que tienen viviendas o vías "
          "cerca. En el detalle está el listado con coordenadas."),
-        ("2", "Visitar los sitios prioritarios", "Son movimientos ya confirmados en campo. "
-         "Con lluvia alta, verificar grietas, hundimientos y drenajes."),
-        ("3", "Registrar lo encontrado", "Cada visita, con o sin movimiento, mejora el modelo "
-         "en el siguiente reentrenamiento."),
+        ("2", "Verificar los sitios prioritarios", "De acuerdo con la información secundaria, en estos sitios"
+         "se presentan condiciones favorables que evidencian un posible movimiento en masa, por lo que se recomienda
+         realizar una verificación del lugar."),
+        ("3", "Registrar lo encontrado", "Realizar las acciones correspondientes"),
     ]
     for n, t, x in pasos:
         st.markdown(
@@ -247,7 +247,7 @@ else:
     st.info("Sin datos de lluvia disponibles en este momento.")
 
 # --------------------------------------------------------------------------
-# 5. Cómo se construye este resumen
+# 5. ¿Cómo se construye este resumen?
 # --------------------------------------------------------------------------
 st.markdown("#### 🧩 Cómo se construye este resumen")
 cajas = [
