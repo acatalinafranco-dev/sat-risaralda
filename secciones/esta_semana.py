@@ -65,17 +65,20 @@ pct = (ll or {}).get("pct_ref")
 # --------------------------------------------------------------------------
 # 1. Lectura en una frase
 # --------------------------------------------------------------------------
-supera = (a7 is not None and a7 >= U["acum7_mm"]) or (a30 is not None and a30 >= U["acum30_mm"])
+supera = a7 is not None and a7 >= U["acum7_mm"]
 alta = pct is not None and pct >= 115
 if supera:
     color, icono, titulo = "#e67e22", "🟠", "Reforzar el seguimiento"
-    razon = "la lluvia acumulada supera el umbral de referencia calibrado con los eventos del departamento"
+    razon = (f"la lluvia de los últimos 7 días ({_c(a7)} mm) supera el umbral de referencia "
+             f"de {U['acum7_mm']} mm, calibrado con los eventos del departamento")
 elif alta:
     color, icono, titulo = "#f1c40f", "🟡", "Atención al seguimiento"
-    razon = "la lluvia de los últimos 30 días está por encima de lo habitual"
+    razon = (f"la lluvia de los últimos 30 días está por encima de lo habitual "
+             f"({pct} % del promedio)")
 else:
     color, icono, titulo = "#27ae60", "🟢", "Seguimiento habitual"
-    razon = "la lluvia está dentro de lo habitual para la época"
+    razon = ("la lluvia está dentro de lo habitual para la época"
+             + (f" ({_c(a7)} mm en 7 días; {pct} % del promedio de 30 días)" if a7 is not None and pct is not None else ""))
 
 frase = (f"En **{nombre_activo()}** {razon}. "
          + (f"Hay **{rs['n_sectores']} sectores de 300 m** para seguimiento "
