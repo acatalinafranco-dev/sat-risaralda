@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from src import monitoreo as mon
 from src import susceptibilidad as sus
 from src.gee_session import codigo_activo, es_departamento, geojson_municipios, lista_municipios
+from src import sectores as sec
 from src.reporte import generar_reporte
 from src.ui import conectar_gee, encabezado, pie_institucional
 
@@ -52,6 +53,12 @@ incluir_cambio = st.toggle(
     help="Agrega las zonas con cambio reciente compatible con movimientos en masa. "
          "Puede tardar 1 a 2 minutos la primera vez del día.")
 
+incluir_sect = st.toggle(
+    "Incluir los sectores para seguimiento de la semana (terreno + lluvia)",
+    value=sec.disponible(), disabled=not sec.disponible(),
+    help="Agrega una página con los sectores de 300 m que esta semana superan el umbral "
+         "de seguimiento. Puede tardar 1 a 2 minutos la primera vez.")
+
 if st.button(f"Preparar el reporte de {nombre}", type="primary"):
     feats = geojson_municipios()["features"]
     f = next(x for x in feats if x["properties"]["codigo"] == cod)
@@ -74,8 +81,19 @@ if st.button(f"Preparar el reporte de {nombre}", type="primary"):
                 cambio = mon.cambios_municipio(mon.cambios_recientes(hoy), cod)
             except Exception as exc:  # noqa: BLE001
                 errores.append(f"monitoreo de cambios: {exc}")
+    sectores = None
+    if incluir_sect:
+        with st.spinner("Calificando los sectores de la semana..."):
+            try:
+                cal = sec.calificar(hoy)
+                sectores = {"fecha": dt.date.fromisoformat(hoy).strftime("%d/%m/%Y"),
+                            "resumen": sec.resumen(cal, cod),
+                            "tabla": sec.sectores(cal, cod)}
+            except Exception as exc:  # noqa: BLE001
+                errores.append(f"sectores de la semana: {exc}")
     with st.spinner("Armando el PDF..."):
-        pdf = generar_reporte(cod, nombre, f["geometry"], otros, lluvia, veg, cambio)
+        pdf = generar_reporte(cod, nombre, f["geometry"], otros, lluvia, veg, cambio,
+                              sectores)
     st.session_state["_reporte"] = (cod, hoy, pdf)
     for e in errores:
         st.warning(f"No fue posible calcular {e}. El reporte indica «s/d» en ese campo.")
