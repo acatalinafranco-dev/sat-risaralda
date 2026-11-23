@@ -73,14 +73,9 @@ if not conectar_gee():
     st.stop()
 
 
-@st.cache_data(ttl=6 * 3600, show_spinner=False)
-def _calificar(f: str) -> dict:
-    return sec.calificar(f)
-
-
 with st.spinner("Calculando la calificación semanal de sectores (1 a 2 minutos la primera vez)..."):
     try:
-        cal = _calificar(fecha.isoformat())
+        cal = sec.calificar_semana(fecha.isoformat())
     except Exception as exc:  # noqa: BLE001
         st.error(f"No fue posible calcular los sectores: {exc}")
         pie_institucional()

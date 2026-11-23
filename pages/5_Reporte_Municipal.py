@@ -85,7 +85,7 @@ if st.button(f"Preparar el reporte de {nombre}", type="primary"):
     if incluir_sect:
         with st.spinner("Calificando los sectores de la semana..."):
             try:
-                cal = sec.calificar(hoy)
+                cal = sec.calificar_semana(hoy)
                 sectores = {"fecha": dt.date.fromisoformat(hoy).strftime("%d/%m/%Y"),
                             "resumen": sec.resumen(cal, cod),
                             "tabla": sec.sectores(cal, cod)}
