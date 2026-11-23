@@ -121,6 +121,25 @@ if ver_cambio:
                              name="Probabilidad de cambio (60 días)", overlay=True,
                              opacity=0.85, zindex=450).add_to(m)
 
+FORMA = {"Antes del sismo": "circulo", "Nuevo después del sismo": "triangulo",
+         "Existente, revisado después del sismo": "rombo",
+         "Después del sismo, sin dato del antecedente": "cuadrado"}
+
+
+def _svg(forma: str, color: str, t: int) -> str:
+    """Símbolo SVG (relleno = nivel de seguimiento; forma = momento del registro)."""
+    b = 'stroke="white" stroke-width="1.5"'
+    if forma == "triangulo":
+        g = f'<polygon points="{t/2},1 {t-1},{t-1} 1,{t-1}" fill="{color}" {b}/>'
+    elif forma == "rombo":
+        g = f'<polygon points="{t/2},1 {t-1},{t/2} {t/2},{t-1} 1,{t/2}" fill="{color}" {b}/>'
+    elif forma == "cuadrado":
+        g = f'<rect x="2" y="2" width="{t-4}" height="{t-4}" fill="{color}" {b}/>'
+    else:
+        g = f'<circle cx="{t/2}" cy="{t/2}" r="{t/2-1.5}" fill="{color}" {b}/>'
+    return f'<svg width="{t}" height="{t}" viewBox="0 0 {t} {t}">{g}</svg>'
+
+
 fg = folium.FeatureGroup(name="Sitios con movimiento en masa", show=True)
 for i, r in pts[pts["nivel"].isin(niveles)].iterrows():
     expo = sus.texto_exposicion(r) or "sin elementos expuestos registrados"
@@ -129,13 +148,16 @@ for i, r in pts[pts["nivel"].isin(niveles)].iterrows():
             f"Susceptibilidad: {r['clase']}<br>Expuestos: {expo}<br>"
             f"Tipo: {r['tipo'] or 's/d'} · Estado: {r['estado'] or 's/d'}<br>"
             f"Visitas: {r['n_visitas']} · última {r['fecha_ultima']:%d/%m/%Y}<br>"
-            f"Fuente: {r['fuente']}<br>{r['lat']:.4f}, {r['lon']:.4f}")
-    folium.CircleMarker(
-        [r["lat"], r["lon"]], radius=7 if r["nivel"] == sus.NIVELES[0] else 5,
-        color="white", weight=1, fill=True, fill_opacity=0.95,
-        fill_color=sus.COLOR_NIVEL[r["nivel"]],
+            f"Fuente: {r['fuente']}<br>"
+            f"Registro: {r.get('momento') or 's/d'}<br>{r['lat']:.4f}, {r['lon']:.4f}")
+    t = 16 if r["nivel"] == sus.NIVELES[0] else 12
+    folium.Marker(
+        [r["lat"], r["lon"]],
+        icon=folium.DivIcon(html=_svg(FORMA.get(r.get("momento"), "circulo"),
+                                      sus.COLOR_NIVEL[r["nivel"]], t),
+                            icon_size=(t, t), icon_anchor=(t // 2, t // 2)),
         popup=folium.Popup(html, max_width=280),
-        tooltip=f"{r['vereda'] or 's/d'} · {r['nivel']}").add_to(fg)
+        tooltip=f"{r['vereda'] or 's/d'} · {r['nivel']} · {r.get('momento') or ''}").add_to(fg)
 fg.add_to(m)
 folium.LayerControl(collapsed=True).add_to(m)
 st_folium(m, height=560, use_container_width=True, key="mapa_susc", returned_objects=[],
@@ -147,8 +169,13 @@ ley = " ".join(
 ley2 = " ".join(
     f"<span style='display:inline-block;width:12px;height:12px;border-radius:50%;"
     f"background:{sus.COLOR_NIVEL[n]};margin:0 4px -1px 10px'></span>{n}" for n in sus.NIVELES)
+ley3 = " ".join(
+    f"<span style='margin:0 4px -3px 10px'>{_svg(f, '#777777', 14)}</span>{k}"
+    for k, f in FORMA.items())
 st.markdown(f"<div style='font-size:0.85rem'><b>Susceptibilidad:</b>{ley}<br>"
-            f"<b>Sitios:</b>{ley2}</div>", unsafe_allow_html=True)
+            f"<b>Sitios (color = nivel):</b>{ley2}<br>"
+            f"<b>Sitios (forma = registro frente al sismo del 10/08/2026):</b>{ley3}</div>",
+            unsafe_allow_html=True)
 if cambio:
     st.caption("Probabilidad de cambio: amarillo (moderada) a magenta (alta). Solo se "
                "muestra donde supera el umbral de detección y la susceptibilidad es "
