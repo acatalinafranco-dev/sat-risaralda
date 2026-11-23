@@ -1,0 +1,69 @@
+{
+ "version": "1.0 (noviembre de 2026)",
+ "modelo": "Random Forest (scikit-learn), 300 árboles, hoja mínima 3, salida de probabilidad",
+ "n_arboles": 300,
+ "min_hoja": 3,
+ "unidad": "Sector de 300 m x 300 m (9 ha), grilla EPSG:3116",
+ "variables": {
+  "terreno": [
+   "Susceptibilidad del modelo propio",
+   "Pendiente media",
+   "Fracción de ladera con pendiente > 25°",
+   "Relieve local",
+   "Edad geológica (SGC 1:100.000)",
+   "Distancia a fallas (SGC)"
+  ],
+  "lluvia": [
+   "Lluvia acumulada 30 días (IMERG)",
+   "Lluvia máxima diaria",
+   "Lluvia máxima en 7 días",
+   "Anomalía frente al promedio 2001-2020 del mes"
+  ],
+  "evidencia_complementaria": [
+   "Pérdida de vegetación con aparición de suelo expuesto (Sentinel-2, últimos 30 días frente a los 90 previos)",
+   "Cambio fuerte en radar VH (Sentinel-1, últimos 12 días frente a los 90 previos)"
+  ]
+ },
+ "entrenamiento": "19.462 sectores-mes de enero de 2024 a agosto de 2026: 262 sectores con movimiento en masa fechado (CDGRD y formulario posterior al sismo) y 600 sectores al azar por mes.",
+ "validacion": {
+  "metodo": "Validación cruzada por bloques espaciales de 5 km; evaluación mes a mes",
+  "auc": 0.921,
+  "auc_sin_sismo": 0.848,
+  "captura_top5": 65.6,
+  "captura_top5_sin_sismo": 44.8,
+  "captura_top10": 79.4,
+  "captura_top10_sin_sismo": 62.4,
+  "solo_terreno": {
+   "auc_sin_sismo": 0.789,
+   "captura_top10_sin_sismo": 52.0
+  },
+  "umbral_seguimiento": {
+   "area_media_pct": 5.0,
+   "area_min_pct": 1.7,
+   "area_max_pct": 19.2,
+   "captura_pct": 76.0,
+   "captura_sin_sismo_pct": 52.0
+  },
+  "umbral_prioritario": {
+   "area_media_pct": 2.0,
+   "captura_pct": 65.3,
+   "captura_sin_sismo_pct": 31.2
+  },
+  "aporte_cambio": "Las variables de cambio de cobertura y radar no mejoraron la calificación (1 a 2 puntos o menos); se reportan como evidencia complementaria."
+ },
+ "umbral_seguimiento": 0.0406,
+ "umbral_prioritario": 0.0853,
+ "cortes_susc": [
+  11,
+  19,
+  28,
+  38
+ ],
+ "limites": [
+  "Los sectores son de 300 m: indican dónde verificar, no el predio afectado.",
+  "La lluvia proviene de satélite (IMERG, ~10 km); puede diferir de las estaciones locales.",
+  "La imagen óptica depende de las nubes; el reporte indica el porcentaje del sector con imagen válida.",
+  "El modelo aprende de eventos visitados; zonas sin reporte histórico pueden estar subrepresentadas.",
+  "Es un reporte informativo de apoyo al seguimiento. No constituye alerta: las alertas las emite el IDEAM."
+ ]
+}
