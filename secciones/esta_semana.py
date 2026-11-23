@@ -19,7 +19,7 @@ from src.ui import (ESRI_IMAGERY_ATTR, ESRI_IMAGERY_URL, GRADIENTE, VERDE_CARDER
 
 encabezado(
     "🗓️ Esta semana · {mun}",
-    "Reporte informativo: resumen para decidir en**dónde hacer seguimiento**, cuánto ha llovido, qué sectores "
+    "Reporte informativo: resumen para decidir **dónde hacer seguimiento**: cuánto ha llovido, qué sectores "
     "reúnen condiciones que favorecen movimientos en masa y qué sitios conocidos "
     "requieren atención.",
 )
@@ -157,6 +157,13 @@ with cm:
     folium.GeoJson(gj, name="Municipios", style_function=lambda f: {
         "color": "#ffffff", "weight": 1.5, "fill": False},
         tooltip=folium.GeoJsonTooltip(["nombre"], labels=False) if es_departamento() else None).add_to(m)
+    # Sitios conocidos primero, para que queden debajo de los sectores
+    for _, r in prio.iterrows():
+        folium.CircleMarker([r["lat"], r["lon"]], radius=3, color="white", weight=0.8,
+                            fill=True, fill_color="#8e44ad", fill_opacity=1,
+                            tooltip=f"Sitio prioritario · {r['vereda'] or r['municipio']} · "
+                                    f"{sus.texto_exposicion(r) or 'sin expuestos registrados'}"
+                            ).add_to(m)
     d = 0.00135
     for _, s in df.head(900 if es_departamento() else 600).iterrows():
         folium.Rectangle([[s["lat"] - d, s["lon"] - d], [s["lat"] + d, s["lon"] + d]],
@@ -164,12 +171,6 @@ with cm:
                          fill=True, fill_opacity=0.6,
                          tooltip=f"{s['nivel']} · {s['exposicion'] or 'sin expuestos identificados'}"
                          ).add_to(m)
-    for _, r in prio.iterrows():
-        folium.CircleMarker([r["lat"], r["lon"]], radius=6, color="white", weight=1.5,
-                            fill=True, fill_color="#8e44ad", fill_opacity=1,
-                            tooltip=f"Sitio prioritario · {r['vereda'] or r['municipio']} · "
-                                    f"{sus.texto_exposicion(r) or 'sin expuestos registrados'}"
-                            ).add_to(m)
     st_folium(m, height=470, use_container_width=True, returned_objects=[])
     st.markdown(
         "<span style='color:#c0392b'>■</span> Sector de seguimiento prioritario &nbsp; "
@@ -183,10 +184,10 @@ with cd:
     pasos = [
         ("1", "Revisar los sectores en rojo", "Empezar por los que tienen viviendas o vías "
          "cerca. En el detalle está el listado con coordenadas."),
-        ("2", "Verificar los sitios prioritarios", "De acuerdo con la información secundaria, en estos sitios"
-         "se presentan condiciones favorables que evidencian un posible movimiento en masa, por lo que se recomienda
-         realizar una verificación del lugar."),
-        ("3", "Registrar lo encontrado", "Realizar las acciones correspondientes"),
+        ("2", "Verificar los sitios prioritarios", "De acuerdo con la información secundaria, en estos sitios "
+         "se presentan condiciones favorables que evidencian un posible movimiento en masa, por lo que se "
+         "recomienda realizar una verificación del lugar."),
+        ("3", "Registrar lo encontrado", "Realizar las acciones correspondientes."),
     ]
     for n, t, x in pasos:
         st.markdown(
