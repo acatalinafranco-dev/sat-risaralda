@@ -84,6 +84,9 @@ with st.spinner("Calculando la calificación semanal de sectores (1 a 2 minutos 
 codigo = codigo_activo()
 df = sec.sectores(cal, codigo)
 r = sec.resumen(cal, codigo)
+if not df.empty:
+    with st.spinner("Ubicando el punto de verificación dentro de cada sector..."):
+        df = sec.agregar_puntos(df, cal["fecha"])
 
 k1, k2, k3, k4 = st.columns(4)
 k1.metric("Sectores para seguimiento", r["n_sectores"])
@@ -101,7 +104,15 @@ gj = geojson_municipios() if es_departamento() else geojson_municipio()
 folium.GeoJson(gj, name="Límite municipal",
                style_function=lambda f: {"color": "#ffffff", "weight": 1.6, "fill": False}).add_to(m)
 d = 0.00135  # media celda (~150 m) en grados
+try:
+    folium.TileLayer(sec.capa_cambio_semana(cal["fecha"], bounds_municipio()),
+                     attr="Copernicus Sentinel-1/2 · Google Earth Engine",
+                     name="Píxeles con cambio (10 m)", overlay=True, show=True,
+                     max_zoom=19).add_to(m)
+except Exception:  # noqa: BLE001
+    pass
 fg = folium.FeatureGroup(name="Sectores", show=True)
+fp = folium.FeatureGroup(name="Puntos de verificación", show=True)
 for _, s in df.head(1500).iterrows():
     expo = s["exposicion"] or "sin edificaciones ni vías cercanas identificadas"
     html = (f"<b>{s['nivel']}</b><br>{sec.TEXTO}<br><br>"
@@ -111,18 +122,26 @@ for _, s in df.head(1500).iterrows():
             f"Cambio de cobertura: {s['cambio_cobertura_pct']:.1f} % del sector "
             f"(imagen válida {s['imagen_optica_valida_pct']:.0f} %)<br>"
             f"Cambio en radar: {s['cambio_radar_pct']:.1f} %<br>"
-            f"Expuestos: {expo}<br>{s['lat']:.4f}, {s['lon']:.4f}")
+            f"Expuestos: {expo}<br><br><b>Punto de verificación:</b> "
+            f"{s['pv_lat']:.5f}, {s['pv_lon']:.5f}<br>{s['pv_criterio']}")
     folium.Rectangle([[s["lat"] - d, s["lon"] - d], [s["lat"] + d, s["lon"] + d]],
                      color=sec.COLOR_NIVEL[s["nivel"]],
                      weight=2 if s["evidencia_cambio"] else 1,
                      fill=True, fill_opacity=0.55,
                      popup=folium.Popup(html, max_width=300),
                      tooltip=f"{s['nivel']}").add_to(fg)
+    folium.CircleMarker([s["pv_lat"], s["pv_lon"]], radius=4, color="#000000", weight=1.2,
+                        fill=True, fill_color="#ffd400", fill_opacity=1,
+                        popup=folium.Popup(html, max_width=300),
+                        tooltip=f"Punto de verificación · {s['pv_criterio']}").add_to(fp)
 fg.add_to(m)
+fp.add_to(m)
 folium.LayerControl(collapsed=True).add_to(m)
 st_folium(m, height=560, use_container_width=True, returned_objects=[])
 st.caption("Rojo: seguimiento prioritario · Naranja: seguimiento. Borde grueso: hay cambio "
-           "de cobertura o en radar dentro del sector.")
+           "de cobertura o en radar dentro del sector. Punto amarillo: lugar que conviene "
+           "verificar dentro del sector (píxel con cambio o, si no hay, el de mayor pendiente). "
+           "Píxeles rojos: pérdida de vegetación (Sentinel-2); azules: cambio en radar (Sentinel-1).")
 
 st.markdown("### Sectores para seguimiento")
 if df.empty:
@@ -131,10 +150,13 @@ else:
     from src.gee_session import geojson_municipios as _gm
     nom = {f["properties"]["codigo"]: f["properties"]["nombre"] for f in _gm()["features"]}
     tab = df.assign(municipio=df["codigo"].map(nom))[
-        ["municipio", "nivel", "lat", "lon", "susceptibilidad", "lluvia_30d_mm",
+        ["municipio", "nivel", "pv_lat", "pv_lon", "pv_criterio", "lat", "lon", "susceptibilidad", "lluvia_30d_mm",
          "lluvia_max7d_mm", "anomalia_lluvia", "cambio_cobertura_pct", "cambio_radar_pct",
          "exposicion"]].rename(columns={
-            "municipio": "Municipio", "nivel": "Nivel", "lat": "Latitud", "lon": "Longitud",
+            "municipio": "Municipio", "nivel": "Nivel",
+            "pv_lat": "Latitud punto", "pv_lon": "Longitud punto",
+            "pv_criterio": "Criterio del punto",
+            "lat": "Latitud centro", "lon": "Longitud centro",
             "susceptibilidad": "Susceptibilidad", "lluvia_30d_mm": "Lluvia 30 d (mm)",
             "lluvia_max7d_mm": "Máx. 7 d (mm)", "anomalia_lluvia": "Anomalía",
             "cambio_cobertura_pct": "Cambio cobertura (%)", "cambio_radar_pct": "Cambio radar (%)",

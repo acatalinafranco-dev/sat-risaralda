@@ -88,7 +88,8 @@ if st.button(f"Preparar el reporte de {nombre}", type="primary"):
                 cal = sec.calificar_semana(hoy)
                 sectores = {"fecha": dt.date.fromisoformat(hoy).strftime("%d/%m/%Y"),
                             "resumen": sec.resumen(cal, cod),
-                            "tabla": sec.sectores(cal, cod)}
+                            "tabla": sec.agregar_puntos(sec.sectores(cal, cod), cal["fecha"],
+                                                        max_n=28)}
             except Exception as exc:  # noqa: BLE001
                 errores.append(f"sectores de la semana: {exc}")
     with st.spinner("Armando el PDF..."):
