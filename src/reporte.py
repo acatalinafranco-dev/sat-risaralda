@@ -1,10 +1,9 @@
-"""Reporte informativo municipal de movimientos en masa (PDF, tamaño carta).
+"""Reporte semanal de movimientos en masa por municipio (PDF, tamaño carta).
 
-Página 1: mensaje principal, indicadores, mapa de susceptibilidad con los
-sitios críticos y la lista priorizada. Página 2: lluvia, cambio de cobertura,
-historial de visitas, acciones sugeridas, método, validación, límites y
-fundamento normativo. Si el municipio tiene más sitios de los que caben, se
-agrega un anexo con la lista completa.
+Página 1: mensaje de la semana, indicadores, mapa de propensión del terreno con
+los sitios conocidos que muestran cambio satelital esta semana (máximo 20) y su
+lista. Página 2: lluvia, evidencia satelital, acciones sugeridas, sustento
+técnico y fundamento normativo. Página 3: sectores de 300 m para seguimiento.
 
 El documento es informativo: no constituye una alerta. Las alertas
 hidrometeorológicas las emite el IDEAM y las decisiones corresponden a los
@@ -192,7 +191,7 @@ def figura_mapa(geom_mun: dict, otros: list[dict], pts: pd.DataFrame,
                                    detalle[3] - detalle[2], fill=False, ec="#004B87",
                                    lw=1.4, zorder=5))
         _panel(ax2, detalle, geom_mun, otros, pts, dentro, lw_mun=1.6)
-        ax2.set_title("Detalle de la zona con más sitios priorizados", fontsize=7)
+        ax2.set_title("Detalle de la zona con más sitios", fontsize=7)
         for sp in ax2.spines.values():
             sp.set_color("#004B87")
             sp.set_linewidth(1.4)
@@ -204,12 +203,12 @@ def figura_mapa(geom_mun: dict, otros: list[dict], pts: pd.DataFrame,
                 arrowprops=dict(arrowstyle="-|>", color="black", lw=1),
                 ha="center", fontsize=8, weight="bold")
     h1 = [plt.Rectangle((0, 0), 1, 1, color=sus.COLOR_CLASE[k]) for k in sus.CLASES]
-    l1 = fig.legend(h1, sus.CLASES, title="Susceptibilidad (modelo)", loc="upper left",
+    l1 = fig.legend(h1, sus.CLASES, title="Propensión del terreno", loc="upper left",
                     bbox_to_anchor=(1.0, 0.98), fontsize=6.5, title_fontsize=7,
                     frameon=False, alignment="left")
     if len(pts):
         hs, ls = ax.get_legend_handles_labels()
-        fig.legend(hs[::-1], ls[::-1], title="Sitios con movimiento en masa",
+        fig.legend(hs[::-1], ls[::-1], title="Sitios con cambio esta semana",
                    loc="upper left", bbox_to_anchor=(1.0, 0.55), fontsize=6.5,
                    title_fontsize=7, frameon=False, alignment="left")
     fig.add_artist(l1)
@@ -322,8 +321,8 @@ def _supera_umbral(m, lluvia) -> list[str]:
     sup = []
     if (lluvia.get("acum7") or 0) >= u["acum7_mm"]:
         sup.append(f"7 días ({lluvia['acum7']:.0f} mm frente a {u['acum7_mm']} mm)")
-    if (lluvia.get("acum30") or 0) >= u["acum30_mm"]:
-        sup.append(f"30 días ({lluvia['acum30']:.0f} mm frente a {u['acum30_mm']} mm)")
+    # El umbral de 30 días se calibró con CHIRPS y no es comparable con IMERG;
+    # para la semana se usa solo el de 7 días (igual que en la página de inicio).
     return sup
 
 
@@ -332,51 +331,46 @@ def _texto_umbral(m, lluvia) -> str:
     if not u:
         return ""
     sup = _supera_umbral(m, lluvia)
-    t = (f"Umbral preliminar de lluvia, calibrado con los eventos del CDGRD: {u['acum7_mm']} mm "
-         f"en 7 días o {u['acum30_mm']} mm en 30 días. ")
+    t = (f"Umbral preliminar de lluvia, calibrado con eventos registrados en el departamento: "
+         f"{u['acum7_mm']} mm en 7 días. ")
     t += ("Hoy se supera en " + " y ".join(sup) + ". ") if sup else "Hoy no se supera. "
     return t + u["desempeno"]
 
 
-def _mensaje(nombre, res, pts, lluvia, cambio, sectores=None) -> str:
-    np_ = res["por_nivel"]["Seguimiento prioritario"]
-    t = (f"{nombre} registra {res['n_sitios']} sitios con movimiento en masa "
-         f"confirmado en las visitas de la coordinación departamental y de las "
-         f"entidades municipales. ")
-    if np_:
-        expo = pts[pts["nivel"] == sus.NIVELES[0]]
-        nviv = int((expo["viviendas"] > 0).sum())
-        t += (f"{np_} requieren seguimiento prioritario"
-              + (f", {nviv} de ellos con viviendas expuestas" if nviv else "") + ". ")
-    t += (f"El {res['alta_muy_alta']:.0f} % del territorio municipal tiene "
-          "susceptibilidad alta o muy alta según el modelo. ")
+def _mensaje(nombre, res, sitios, lluvia, sectores=None) -> str:
+    """Mensaje de la semana: lluvia, sectores y sitios conocidos con cambio."""
+    t = ""
+    a7 = lluvia.get("acum7") if lluvia else None
     p = lluvia.get("pct_ref") if lluvia else None
-    if p is not None and p == p:
-        estado = ("por encima" if p >= 115 else "por debajo" if p <= 85 else "cerca")
-        t += (f"La lluvia de los últimos 30 días equivale al {p:.0f} % de la "
-              f"referencia histórica ({estado} de lo habitual). ")
+    if a7 is not None and a7 == a7:
+        t += f"En los últimos 7 días llovieron {a7:.0f} mm en {nombre}"
+        if p is not None and p == p:
+            estado = ("por encima de" if p >= 115 else "por debajo de" if p <= 85 else "cerca de")
+            t += f"; la lluvia de 30 días está {estado} lo habitual ({p:.0f} %)"
+        t += ". "
     sup = _supera_umbral(sus.meta(), lluvia)
     if sup:
-        t += ("La lluvia acumulada supera el umbral preliminar de "
-              + " y ".join(sup) + ": conviene reforzar el seguimiento de los sitios "
-              "priorizados. ")
-    if cambio and cambio.get("n_zonas"):
-        t += (f"El monitoreo satelital identifica {cambio['n_zonas']} zonas con "
-              "cambios recientes compatibles con movimientos en masa, que conviene "
-              "verificar. ")
+        t += ("La lluvia acumulada supera el umbral preliminar de " + " y ".join(sup)
+              + ": se sugiere hacer seguimiento a los sectores y sitios señalados. ")
     if sectores and sectores.get("resumen"):
         r = sectores["resumen"]
         if r["n_sectores"]:
-            t += (f"En la semana analizada, {r['n_sectores']} de los {r.get('n_total', 0)} "
-                  f"sectores de 300 m del municipio ({_c(r['pct_area'])} %) reúnen "
-                  "condiciones de terreno y lluvia que sugieren hacer seguimiento y "
-                  "verificar cambios en el terreno"
-                  + (f"; {r['n_prioritarios']} con seguimiento prioritario" if r["n_prioritarios"] else "")
+            t += (f"Esta semana, {r['n_sectores']} de los {r.get('n_total', 0)} sectores de "
+                  f"300 m del municipio ({_c(r['pct_area'])} %) reúnen condiciones de terreno "
+                  "y lluvia que sugieren hacer seguimiento"
+                  + (f"; {r['n_prioritarios']} en seguimiento prioritario" if r["n_prioritarios"] else "")
                   + ". ")
         else:
-            t += ("En la semana analizada ningún sector supera el umbral de "
-                  "seguimiento por terreno y lluvia. ")
-    return t
+            t += "Esta semana ningún sector supera el umbral de seguimiento por terreno y lluvia. "
+    n = 0 if sitios is None else len(sitios)
+    if n:
+        t += (f"{n} sitio{'s' if n > 1 else ''} donde ya se había registrado un movimiento en "
+              f"masa muestra{'n' if n > 1 else ''} cambios en el terreno detectados por satélite "
+              "esta semana. ")
+    else:
+        t += ("Ningún sitio con movimiento en masa registrado muestra cambios en el terreno "
+              "detectados por satélite esta semana. ")
+    return t + "Reporte informativo: la verificación y las acciones corresponden a la administración municipal."
 
 
 def figura_sectores(geom_mun: dict, df: pd.DataFrame) -> ImageReader:
@@ -430,14 +424,14 @@ def _pagina_sectores(c, nombre: str, sectores: dict, pag: int, geom_mun=None) ->
                            f"{sectores.get('fecha', '')}", MX, y)
     y = _parrafo(c, sec.TEXTO, MX, y, UTIL, fuente="Helvetica-Bold", tam=8, interlin=10) - 2
     vv = ms["validacion"]
-    intro = (f"Sectores de 300 m calificados con el terreno (susceptibilidad, pendiente, "
+    intro = (f"Sectores de 300 m calificados con el terreno (propensión, pendiente, "
              "relieve, geología y fallas del SGC) y la lluvia satelital de los 30 días previos "
              "(acumulado, máximos de 1 y 7 días y anomalía). Se marca «seguimiento» cuando la "
              "calificación supera el umbral validado y «seguimiento prioritario» en el umbral "
              f"superior. En la validación 2024-2026, el umbral de seguimiento marcó en promedio "
              f"el {vv['umbral_seguimiento']['area_media_pct']:.0f} % del departamento y señaló "
              f"el {vv['umbral_seguimiento']['captura_sin_sismo_pct']:.0f} % de los eventos "
-             "visitados después (sin contar el sismo de agosto de 2026). El cambio de cobertura "
+             "registrados después (sin contar el sismo de agosto de 2026). El cambio de cobertura "
              "(Sentinel-2) y de radar (Sentinel-1) se indica como evidencia complementaria. "
              "Para cada sector se da un punto de verificación: el píxel de 10 m con cambio "
              "detectado o, si no lo hay, el de mayor pendiente dentro del sector.")
@@ -474,7 +468,7 @@ def _pagina_sectores(c, nombre: str, sectores: dict, pag: int, geom_mun=None) ->
                   + ("" if s_["imagen_optica_valida_pct"] >= 50 else " (nubes)"),
                   s_["exposicion"] or "—"]
                  for i, s_ in df.iterrows()]
-        cab = ["N°", "Nivel", "Punto de verificación", "Criterio", "Suscep.",
+        cab = ["N°", "Nivel", "Punto de verificación", "Criterio", "Propens.",
                "Lluvia 30 d / 7 d", "Anom.", "Cambio", "Expuestos"]
         anchos = [18, 58, 92, 52, 44, 66, 32, 50, UTIL - 412]
         y = _tabla(c, MX, y, cab, filas, anchos, tam=6.4, alto_f=11.2)
@@ -496,17 +490,18 @@ def _pagina_sectores(c, nombre: str, sectores: dict, pag: int, geom_mun=None) ->
 
 
 def generar_reporte(codigo: str, nombre: str, geom_mun: dict, otros: list[dict],
-                    lluvia: dict | None = None, vegetacion: dict | None = None,
-                    cambio: dict | None = None, sectores: dict | None = None) -> bytes:
-    """«lluvia»: {serie, acum7, acum30, ref30, pct_ref}. «vegetacion»:
-    {perdida_ha, png (bytes) opcional}. «cambio»: {n_zonas, zonas: [...]}.
-    «sectores»: {fecha, resumen, tabla (DataFrame de src.sectores.sectores)}"""
+                    lluvia: dict | None = None, sectores: dict | None = None,
+                    sitios: pd.DataFrame | None = None, fecha: str | None = None) -> bytes:
+    """Reporte semanal. «lluvia»: {serie, acum7, acum30, ref30, pct_ref}.
+    «sectores»: {fecha, resumen, tabla}. «sitios»: sitios conocidos con cambio
+    satelital esta semana (src.sectores.sitios_semana)."""
     m = sus.meta()
     res = sus.resumen_municipio(codigo)
-    pts = sus.puntos(codigo)
+    sitios = sitios if sitios is not None else sus.puntos(codigo).iloc[0:0]
+    fecha_txt = dt.date.fromisoformat(fecha).strftime("%d/%m/%Y") if fecha else ""
     buf = io.BytesIO()
     c = canvas.Canvas(buf, pagesize=letter)
-    c.setTitle(f"Reporte informativo de movimientos en masa - {nombre}")
+    c.setTitle(f"Reporte semanal de movimientos en masa - {nombre}")
     c.setAuthor(ENTIDAD)
 
     # ======================= PÁGINA 1 =======================================
@@ -514,15 +509,14 @@ def generar_reporte(codigo: str, nombre: str, geom_mun: dict, otros: list[dict],
     y -= 16
     c.setFillColor(colors.black)
     c.setFont("Helvetica-Bold", 15)
-    c.drawString(MX, y, f"Reporte informativo de movimientos en masa · {nombre}")
+    c.drawString(MX, y, f"Reporte semanal de movimientos en masa · {nombre}")
     y -= 13
     c.setFont("Helvetica", 8.5)
     c.setFillColor(GRIS)
-    c.drawString(MX, y, "Dirigido a la Alcaldía y al Consejo Municipal de Gestión del "
-                        "Riesgo de Desastres (CMGRD). Documento de apoyo al seguimiento.")
+    c.drawString(MX, y, f"Semana que termina el {fecha_txt}. Reporte informativo de monitoreo "
+                        "satelital; no constituye una alerta.")
     y -= 12
-    # Mensaje principal
-    msg = _mensaje(nombre, res, pts, lluvia, cambio, sectores)
+    msg = _mensaje(nombre, res, sitios, lluvia, sectores)
     lineas = simpleSplit(msg, "Helvetica", 8.6, UTIL - 20)
     h = 14 + 10.6 * len(lineas)
     c.setFillColor(colors.HexColor("#fff8e1"))
@@ -531,26 +525,28 @@ def generar_reporte(codigo: str, nombre: str, geom_mun: dict, otros: list[dict],
     c.rect(MX, y - h, 3, h, fill=1, stroke=0)
     _parrafo(c, msg, MX + 10, y - 12, UTIL - 20, tam=8.6, interlin=10.6)
     y -= h + 8
-    # Indicadores
+    # Indicadores de la semana
     w = (UTIL - 18) / 4
     hk = 46
+    u7 = (m.get("umbral_lluvia") or {}).get("acum7_mm", 63)
+    a7 = lluvia.get("acum7") if lluvia else None
     pct = lluvia.get("pct_ref") if lluvia else None
-    _kpi(c, MX, y - hk, w, hk, str(res["por_nivel"]["Seguimiento prioritario"]),
-         "sitios en seguimiento prioritario", colors.HexColor(sus.COLOR_NIVEL[sus.NIVELES[0]]))
-    _kpi(c, MX + (w + 6), y - hk, w, hk, f"{res['alta_muy_alta']:.0f} %",
-         "del municipio con susceptibilidad alta o muy alta (modelo)",
-         colors.HexColor(sus.COLOR_CLASE["Alta"]))
-    _kpi(c, MX + 2 * (w + 6), y - hk, w, hk, f"{_n(pct)} %",
-         "lluvia de 30 días frente a la referencia histórica", colors.HexColor("#2b8cbe"))
-    ncz = (cambio or {}).get("n_zonas")
-    _kpi(c, MX + 3 * (w + 6), y - hk, w, hk, _n(ncz),
-         "zonas con cambio satelital reciente a verificar", VERDE)
+    rs = (sectores or {}).get("resumen") or {}
+    _kpi(c, MX, y - hk, w, hk, f"{_n(a7)} mm",
+         f"lluvia de los últimos 7 días (umbral de referencia {u7} mm)", colors.HexColor("#2b8cbe"))
+    _kpi(c, MX + (w + 6), y - hk, w, hk, f"{_n(pct)} %",
+         "lluvia de 30 días frente a lo habitual", colors.HexColor("#2b8cbe"))
+    _kpi(c, MX + 2 * (w + 6), y - hk, w, hk, _n(rs.get("n_sectores")),
+         f"sectores de 300 m para seguimiento ({_n(rs.get('n_prioritarios'))} prioritarios)",
+         colors.HexColor(sus.COLOR_NIVEL[sus.NIVELES[0]]))
+    _kpi(c, MX + 3 * (w + 6), y - hk, w, hk, str(len(sitios)),
+         "sitios conocidos con cambio satelital esta semana", colors.HexColor("#8e44ad"))
     y -= hk + 10
 
-    # Mapa a todo el ancho
-    img, _ = figura_mapa(geom_mun, otros, pts)
+    # Mapa con los sitios conocidos que cambiaron esta semana
+    img, _ = figura_mapa(geom_mun, otros, sitios)
     iw, ih = img.getSize()
-    h_max = 300
+    h_max = 290
     w_map = UTIL
     h_map = w_map * ih / iw
     if h_map > h_max:
@@ -559,89 +555,68 @@ def generar_reporte(codigo: str, nombre: str, geom_mun: dict, otros: list[dict],
     c.drawImage(img, MX + (UTIL - w_map) / 2, y - h_map, width=w_map, height=h_map,
                 mask="auto")
     y -= h_map + 8
-    y = _parrafo(c, "Susceptibilidad: modelo Random Forest (CARDER, 2026), resolución 30 m "
-                    "presentada a 60 m. Sitios: inventario unificado CDGRD 2017-2026 y "
-                    "formulario posterior al sismo de 2026. Los números corresponden al "
-                    "orden de la tabla.", MX, y, UTIL, tam=6.3, interlin=7.5, color=GRIS)
+    y = _parrafo(c, "Propensión del terreno: modelo propio (CARDER, 2026), 30 m presentada a "
+                    "60 m. Sitios: lugares con movimiento en masa registrado donde esta semana "
+                    "el satélite detectó pérdida de vegetación o cambio persistente en radar en "
+                    "un radio de 100 m (máximo 20 por municipio). Los números corresponden a la "
+                    "tabla.", MX, y, UTIL, tam=6.3, interlin=7.5, color=GRIS)
     y -= 6
-    y = _titulo_seccion(c, "Sitios priorizados por índice de atención", MX, y)
-    n_caben = max(4, int((y - 80) / 11.5) - 1)
-    top = pts.head(n_caben)
-    filas = []
-    for i, r in top.iterrows():
-        filas.append([str(i + 1), r["vereda"] or "s/d",
-                      (r["nivel"].replace("Seguimiento prioritario", "Prioritario"),
-                       sus.COLOR_NIVEL[r["nivel"]]),
-                      r["clase"], sus.texto_exposicion(r) or "—",
-                      f"{r['lat']:.4f}, {r['lon']:.4f}",
-                      r["fecha_ultima"].strftime("%d/%m/%Y")])
-    if filas:
-        y = _tabla(c, MX, y, ["N°", "Vereda / barrio", "Nivel", "Susceptib.",
-                              "Elementos expuestos", "Coordenadas", "Últ. visita"],
-                   filas, [18, 128, 76, 52, 138, 72, UTIL - 484], tam=6.7, alto_f=11.5)
-        if len(pts) > len(top):
-            _parrafo(c, f"La lista continúa con {len(pts) - len(top)} sitios más en el "
-                        "anexo y en la aplicación.", MX, y - 3, UTIL, tam=6.6, color=GRIS)
+    y = _titulo_seccion(c, "Sitios conocidos con cambio detectado esta semana", MX, y)
+    if len(sitios):
+        filas = []
+        for i, r in sitios.reset_index(drop=True).iterrows():
+            filas.append([str(i + 1), r["vereda"] or "s/d",
+                          (r["nivel"].replace("Seguimiento prioritario", "Prioritario"),
+                           sus.COLOR_NIVEL[r["nivel"]]),
+                          r["cambio_detectado"], f"{100 * r['f_cambio']:.0f} %",
+                          sus.texto_exposicion(r) or "—",
+                          f"{r['lat']:.4f}, {r['lon']:.4f}"])
+        y = _tabla(c, MX, y, ["N°", "Vereda / barrio", "Nivel", "Cambio detectado",
+                              "Área con cambio", "Elementos expuestos", "Coordenadas"],
+                   filas, [18, 120, 70, 96, 56, 112, UTIL - 472], tam=6.7, alto_f=11.5)
+        _parrafo(c, "Área con cambio: porcentaje del círculo de 100 m alrededor del sitio con "
+                    "cambio detectado. Se sugiere verificar en campo.", MX, y - 3, UTIL,
+                 tam=6.6, color=GRIS)
     else:
-        _parrafo(c, "No hay sitios con movimiento en masa confirmado en el inventario de "
-                    "visitas para este municipio. Se recomienda revisar el mapa de "
-                    "susceptibilidad y los cambios satelitales.", MX, y, UTIL)
+        _parrafo(c, "Esta semana ningún sitio con movimiento en masa registrado muestra cambios "
+                    "detectados por satélite. Los sectores para seguimiento se presentan en la "
+                    "página 3.", MX, y, UTIL)
     _pie(c)
     c.showPage()
 
     # ======================= PÁGINA 2 =======================================
     y = _encabezado(c, nombre, 2)
     y -= 14
-    y2 = _titulo_seccion(c, "Lluvia y antecedentes", MX, y)
+    y2 = _titulo_seccion(c, "Lluvia de los últimos 60 días", MX, y)
     if lluvia and lluvia.get("serie"):
         c.drawImage(figura_lluvia(lluvia.get("serie_completa") or lluvia["serie"],
-                                  lluvia.get("ref30"), (m.get("umbral_lluvia") or {}).get("acum30_mm")),
-                    MX, y2 - 140,
-                    width=300, height=140, preserveAspectRatio=True, anchor="nw")
-    c.drawImage(figura_visitas(m.get("visitas_por_anio", {}).get(codigo, {})),
-                MX + 310, y2 - 140, width=UTIL - 310, height=140,
-                preserveAspectRatio=True, anchor="nw")
-    y = y2 - 148
+                                  lluvia.get("ref30"), None),
+                    MX, y2 - 150, width=UTIL, height=150, preserveAspectRatio=True, anchor="nw")
+    y = y2 - 158
     if lluvia:
         y = _parrafo(c, f"Lluvia acumulada: {_n(lluvia.get('acum7'))} mm en 7 días y "
                         f"{_n(lluvia.get('acum30'))} mm en 30 días (NASA GPM IMERG). "
                         f"Referencia de 30 días: {_n(lluvia.get('ref30'))} mm (promedio "
-                        "CHIRPS 20 años de la misma ventana). " + _texto_umbral(m, lluvia),
+                        "CHIRPS de 20 años de la misma ventana). " + _texto_umbral(m, lluvia),
                      MX, y, UTIL, tam=7.2, interlin=9)
     y -= 6
-    # Cambio de cobertura y señal satelital
-    y = _titulo_seccion(c, "Cambio de cobertura y señal satelital", MX, y)
-    yc = y
-    if vegetacion and vegetacion.get("png"):
-        c.drawImage(ImageReader(io.BytesIO(vegetacion["png"])), MX, y - 150, width=190,
-                    height=150, preserveAspectRatio=True, anchor="nw")
-        xt, wt = MX + 200, UTIL - 200
-    else:
-        xt, wt = MX, UTIL
-    txt = (f"Pérdida severa de vegetación en los últimos 60 días: "
-           f"{_n((vegetacion or {}).get('perdida_ha'), '{:,.0f}')} ha (Sentinel-2, "
-           "caída del NDVI mayor a 0,20 frente a hace 6 a 12 meses, en zonas con NDVI > 0,4). "
-           "Puede deberse a movimientos en masa, pero también a talas, cosechas o "
-           "quemas: requiere verificación.")
-    yc = _parrafo(c, txt, xt, yc, wt, tam=7.2, interlin=9)
-    if cambio and cambio.get("zonas"):
-        yc -= 4
-        yc = _parrafo(c, "Zonas con cambio satelital compatible con movimiento en masa "
-                         "(modelo de cambio, Sentinel-1 y Sentinel-2):",
-                      xt, yc, wt, fuente="Helvetica-Bold", tam=7.2, interlin=9)
-        filas = [[str(i + 1), f"{z['lat']:.4f}, {z['lon']:.4f}", f"{z['prob']:.0f} %",
-                  z.get("clase", "")] for i, z in enumerate(cambio["zonas"][:6])]
-        yc = _tabla(c, xt, yc, ["N°", "Coordenadas", "Probabilidad", "Susceptibilidad"],
-                    filas, [18, 90, 60, wt - 168], tam=6.6, alto_f=11)
-    y = min(yc, y - 150 if vegetacion and vegetacion.get("png") else yc) - 8
+    y = _titulo_seccion(c, "Evidencia satelital de la semana", MX, y)
+    txt = ("Se buscan cambios en el terreno con dos sensores: pérdida de vegetación con suelo "
+           "expuesto en Sentinel-2 (últimos 12 días frente a los 30 anteriores y últimos 30 días "
+           "frente a los 90 anteriores) y cambio persistente en el radar Sentinel-1 (misma órbita; "
+           "últimos 12 días frente a los 30, 60 y 90 anteriores). ")
+    if rs:
+        txt += (f"Esta semana, {_n(rs.get('n_con_cambio'))} de los sectores para seguimiento "
+                "presentan alguno de esos cambios. ")
+    txt += ("Un cambio puede deberse a un movimiento en masa, pero también a cosechas, talas, "
+            "quemas u obras: requiere verificación.")
+    y = _parrafo(c, txt, MX, y, UTIL, tam=7.2, interlin=9) - 8
 
     # Acciones sugeridas
-    y = _titulo_seccion(c, "Acciones sugeridas según el nivel", MX, y)
-    y = _parrafo(c, "El nivel resulta de un índice de 0 a 100 que combina la "
-                    "susceptibilidad del modelo (35 %), la prioridad asignada en campo "
-                    "(25 %), los elementos expuestos (25 %) y la actividad del movimiento "
-                    "(15 %). Prioritario: 65 o más, o prioridad crítica o alta asignada en "
-                    "campo; seguimiento: 45 a 64; vigilancia: menos de 45.", MX, y, UTIL, tam=6.9, interlin=8.4) - 4
+    y = _titulo_seccion(c, "Acciones sugeridas", MX, y)
+    y = _parrafo(c, "Orientaciones de apoyo. La verificación en campo y las acciones que se "
+                    "deriven de ella corresponden a la administración municipal, en el marco de "
+                    "su autonomía.", MX, y, UTIL, tam=6.9, interlin=8.4) - 4
     wb = (UTIL - 12) / 3
     hb = 64
     for i, n in enumerate(sus.NIVELES):
@@ -650,79 +625,56 @@ def generar_reporte(codigo: str, nombre: str, geom_mun: dict, otros: list[dict],
         c.roundRect(x, y - hb, wb, hb, 3, fill=1, stroke=0)
         c.setFillColor(colors.HexColor(sus.COLOR_NIVEL[n]))
         c.rect(x, y - hb, 3, hb, fill=1, stroke=0)
+        c.setFillColor(colors.black)
         c.setFont("Helvetica-Bold", 7.6)
-        c.drawString(x + 8, y - 11, f"{n} ({res['por_nivel'][n]})")
+        c.drawString(x + 8, y - 11, n)
         _parrafo(c, sus.ACCION_NIVEL[n], x + 8, y - 22, wb - 14, tam=6.7, interlin=8.1)
     y -= hb + 10
 
-    # Método, validación y límites
+    # Sustento técnico
     y = _titulo_seccion(c, "Sustento técnico", MX, y)
     v = m["validacion"]
+    vs = {}
+    try:
+        from src import sectores as sec
+        vs = sec.meta()["validacion"]
+    except Exception:  # noqa: BLE001
+        pass
     metodo = (
-        f"Modelo de susceptibilidad: bosque aleatorio (Random Forest, {m['n_arboles']} "
-        f"árboles) entrenado con {m['n_presencias']} sitios con movimiento en masa "
-        f"confirmado, {m['n_ausencias']} sitios visitados sin movimiento y "
-        f"{m['n_fondo']} puntos de fondo, con {len(m['variables'])} variables de "
-        "terreno (NASADEM 30 m), drenaje (MERIT Hydro), vías (GRIP4), cobertura "
-        "(ESA WorldCover, Landsat 8), lluvia histórica (CHIRPS) y suelos "
-        "(OpenLandMap). Validación cruzada por bloques espaciales de 5 km: "
-        f"AUC {_c(v['auc'])} (rango {_c(v['auc_min'])} a {_c(v['auc_max'])}); "
-        f"en la validación, {v['pct_eventos_alta']:.0f} % de los eventos cayó en "
-        f"susceptibilidad alta o muy alta, que ocupa {v['pct_area_alta']:.0f} % del "
-        "departamento.")
+        "Sectores de la semana: cada sector de 300 m se califica con un modelo estadístico "
+        "(bosque aleatorio) que combina el terreno (propensión, pendiente en clases IGAC, "
+        "relieve, geología y fallas del SGC) con la lluvia satelital de los últimos 30 días. "
+        + (f"En la prueba con movimientos en masa de 2024 a 2026 (sin el mes del sismo), "
+           f"marcando en promedio el {vs['umbral_seguimiento']['area_media_pct']:.0f} % del "
+           f"departamento se habría señalado el {vs['umbral_seguimiento']['captura_sin_sismo_pct']:.0f} % "
+           "de los eventos. " if vs else "")
+        + "Propensión del terreno: modelo propio a 30 m que relaciona los movimientos en masa "
+        "registrados con el terreno, el drenaje, los suelos, la cobertura, las vías y la lluvia "
+        f"histórica; el {v['pct_eventos_alta']:.0f} % de los eventos cayó en las clases alta y muy "
+        f"alta, que ocupan el {v['pct_area_alta']:.0f} % del departamento.")
     y = _parrafo(c, metodo, MX, y, UTIL, tam=6.9, interlin=8.4)
     limites = (
-        "Límites: el inventario refleja eventos visitados (con afectación o reporte "
-        "ciudadano), por lo que el modelo indica dónde es más probable un evento que "
-        "afecte a la población, no la amenaza física completa. A escala de predio "
-        "no distingue sitios con y sin movimiento. No incluye geología detallada ni "
-        "fallas. Complementa, y no reemplaza, la zonificación del SGC (1:100.000) y "
-        "los estudios del POT.")
+        "Límites: es un monitoreo de escala regional. A escala de predio no distingue sitios "
+        "con y sin movimiento. Complementa, y no reemplaza, la zonificación del SGC "
+        "(1:100.000) ni los estudios básicos y detallados del POT (Decreto 1077 de 2015). "
+        "No constituye una alerta: las alertas hidrometeorológicas las emite el IDEAM.")
     y = _parrafo(c, limites, MX, y - 2, UTIL, tam=6.9, interlin=8.4)
     norma = (
-        "Fundamento: Ley 1523 de 2012 (arts. 2, 4, 12 y 14): la gestión del "
-        "riesgo es responsabilidad de todas las autoridades; los alcaldes son "
-        "conductores del sistema en su jurisdicción y el conocimiento del riesgo "
-        "incluye el monitoreo y la comunicación. Las CAR apoyan a las entidades "
-        "territoriales en los estudios para el conocimiento y la reducción del riesgo "
-        "(art. 31).")
+        "Fundamento: Ley 1523 de 2012 (arts. 4, 12, 14 y 31): el conocimiento del riesgo "
+        "incluye el monitoreo y la comunicación del riesgo; los alcaldes conducen la gestión "
+        "del riesgo en su jurisdicción y las corporaciones autónomas regionales apoyan a las "
+        "entidades territoriales en los estudios para el conocimiento del riesgo.")
     y = _parrafo(c, norma, MX, y - 2, UTIL, tam=6.9, interlin=8.4)
-    fuentes = ("Fuentes: CARDER; coordinación departamental de gestión del riesgo "
-               "(información de visitas compartida); Secretaría de Infraestructura y "
-               "DIGER de Pereira; NASA (GPM IMERG, NASADEM); UCSB CHG (CHIRPS); ESA "
-               "Copernicus (Sentinel-1, Sentinel-2, WorldCover); USGS (Landsat 8); "
-               "MERIT Hydro; GRIP4; OpenLandMap; SGC. Procesado en Google Earth "
-               "Engine. Cómo citar: " + CITA)
+    fuentes = ("Fuentes: CARDER; NASA (GPM IMERG, NASADEM); UCSB CHG (CHIRPS); ESA Copernicus "
+               "(Sentinel-1, Sentinel-2, WorldCover); USGS (Landsat 8); MERIT Hydro; GRIP4; "
+               "OpenLandMap; SGC; IGAC (clases de pendiente). Procesado en Google Earth Engine. "
+               "Cómo citar: " + CITA)
     _parrafo(c, fuentes, MX, y - 2, UTIL, tam=6.2, interlin=7.6, color=GRIS)
     _pie(c)
     c.showPage()
 
     # ======================= SECTORES DE LA SEMANA ==========================
-    pag = 3
     if sectores is not None:
-        pag = _pagina_sectores(c, nombre, sectores, pag, geom_mun)
-
-    # ======================= ANEXO (lista completa) =========================
-    if len(pts) > len(top):
-        filas = [[str(i + 1), r["vereda"] or "s/d", f"{r['lat']:.4f}, {r['lon']:.4f}",
-                  (r["nivel"].replace("Seguimiento prioritario", "Prioritario"),
-                   sus.COLOR_NIVEL[r["nivel"]]),
-                  r["clase"], sus.texto_exposicion(r) or "—",
-                  r["fecha_ultima"].strftime("%d/%m/%Y"), r["tipo"] or "s/d"]
-                 for i, r in pts.iterrows()]
-        anchos = [20, 104, 78, 70, 50, 104, 48, UTIL - 474]
-        while filas:
-            y = _encabezado(c, nombre, pag)
-            y -= 14
-            y = _titulo_seccion(c, "Anexo · Lista completa de sitios con movimiento "
-                                   "en masa confirmado", MX, y)
-            cab = ["N°", "Vereda / barrio", "Coordenadas", "Nivel", "Suscep.",
-                   "Expuestos", "Últ. visita", "Tipo"]
-            n_caben = int((y - 70) / 11.5) - 1
-            y = _tabla(c, MX, y, cab, filas[:n_caben], anchos, tam=6.4, alto_f=11.5)
-            filas = filas[n_caben:]
-            _pie(c)
-            c.showPage()
-            pag += 1
+        _pagina_sectores(c, nombre, sectores, 3, geom_mun)
     c.save()
     return buf.getvalue()

@@ -14,8 +14,11 @@ def mostrar_secciones(secciones: dict[str, str], clave: str) -> None:
 
     secciones: {etiqueta: archivo dentro de pages/vistas}. Cada vista conserva
     su propio encabezado, guía y controles; solo se ejecuta la seleccionada."""
-    elegida = st.radio("Sección", list(secciones), horizontal=True, key=clave,
-                       label_visibility="collapsed")
+    if len(secciones) == 1:
+        elegida = next(iter(secciones))
+    else:
+        elegida = st.radio("Sección", list(secciones), horizontal=True, key=clave,
+                           label_visibility="collapsed")
     original = st.set_page_config
     st.set_page_config = lambda *a, **k: None  # la página contenedora ya la fijó
     try:

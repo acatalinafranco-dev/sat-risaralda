@@ -144,6 +144,39 @@ def mapa_cambio_ndvi(ref_ini: str, ref_fin: str, act_ini: str, act_fin: str,
     }
 
 
+def mapa_vegetacion(act_ini: str, act_fin: str, ref_ini: str, ref_fin: str,
+                    umbral: float = -0.20) -> dict:
+    """Un solo mapa: estado actual (NDVI del período reciente) y pérdida de
+    vegetación frente al período de referencia. Solo teselas (rápido).
+
+    Pérdida = ΔNDVI < umbral, donde antes había vegetación (NDVI > 0,4) y en
+    ladera (pendiente >= 10°), mostrando solo grupos de píxeles (no sueltos)."""
+    ndvi_ref = compuesto_indices(ref_ini, ref_fin).select("NDVI")
+    ndvi_act = compuesto_indices(act_ini, act_fin).select("NDVI")
+    zona = roi()
+    slope = ee.Terrain.slope(ee.Image("NASA/NASADEM_HGT/001").select("elevation"))
+    delta = ndvi_act.subtract(ndvi_ref)
+    perdida = (delta.lt(umbral).And(ndvi_ref.gt(0.4)).And(slope.gte(10))
+               .unmask(0, False).focalMean(15, "circle", "meters").gte(0.5)
+               .selfMask().clip(zona))
+    return {
+        "tiles_ndvi": tiles_de(ndvi_act.clip(zona), {"min": 0.0, "max": 0.9,
+                                                     "palette": PALETA_NDVI}),
+        "tiles_perdida": tiles_de(perdida, {"palette": ["ff00ff"]}),
+        "vis_ndvi": {"min": 0.0, "max": 0.9, "palette": PALETA_NDVI},
+        "_perdida": perdida,
+    }
+
+
+def area_perdida_ha(act_ini: str, act_fin: str, ref_ini: str, ref_fin: str,
+                    umbral: float = -0.20) -> float:
+    perdida = mapa_vegetacion(act_ini, act_fin, ref_ini, ref_fin, umbral)["_perdida"]
+    r = perdida.multiply(ee.Image.pixelArea()).divide(10_000).reduceRegion(
+        reducer=ee.Reducer.sum(), geometry=roi(), scale=20, maxPixels=1e9,
+        bestEffort=True).getInfo()
+    return round(list(r.values())[0] or 0, 1) if r else 0.0
+
+
 # --------------------------------------------------------------------------
 # Serie temporal NDVI (media municipal por mes)
 # --------------------------------------------------------------------------

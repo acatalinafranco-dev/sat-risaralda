@@ -39,15 +39,13 @@ COLOR_NIVEL = {"Seguimiento prioritario": "#c0392b", "Seguimiento": "#e67e22",
                "Vigilancia": "#2e86c1"}
 ACCION_NIVEL = {
     "Seguimiento prioritario": (
-        "Verificar en campo a la mayor brevedad. Si hay viviendas o personas "
-        "expuestas, evaluar con el CMGRD medidas como restricción de uso, "
-        "cierre de acceso o evacuación preventiva."),
+        "Verificar información, principalmente los elementos expuestos."),
     "Seguimiento": (
-        "Programar inspección periódica, en especial después de lluvias "
-        "intensas. Revisar manejo de aguas lluvias y de escorrentía."),
+        "Programar inspección periódica, en especial después de lluvias intensas. "
+        "Revisar manejo de aguas lluvias y de escorrentía."),
     "Vigilancia": (
-        "Incluir en los recorridos de rutina y atender reportes de la "
-        "comunidad (grietas, hundimientos, árboles o postes inclinados)."),
+        "Atender en caso de que se reporten cambios en el terreno (grietas, hundimientos, "
+        "árboles o postes inclinados, etc.)."),
 }
 
 
@@ -70,6 +68,7 @@ def _puntos_todos() -> pd.DataFrame:
     for c in ("post_sismo", "via", "equipamiento"):
         df[c] = df[c].astype(bool)
     df["fecha_ultima"] = pd.to_datetime(df["fecha_ultima"])
+    df["pid"] = np.arange(len(df))
     return df
 
 

@@ -1,4 +1,4 @@
-"""Herramientas interactivas del SAT Risaralda.
+"""Herramientas interactivas del Monitoreo satelital Risaralda.
 
   - Consulta por clic: municipio y punto (amenaza SGC, lluvia, pendiente y
     evento más cercano).
@@ -110,7 +110,7 @@ def _acum_imerg(dias: int):
 
 def _normal_img(dias: int, anios: int = 20):
     """Lluvia acumulada media (mm) de la misma ventana en los últimos anios
-    años (CHIRPS diario): referencia de apoyo del SAT."""
+    años (CHIRPS diario): referencia de apoyo del monitoreo."""
     import ee
     hoy = dt.date.today()
     imgs = []

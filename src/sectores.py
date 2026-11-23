@@ -86,8 +86,19 @@ def semana_de(fecha: dt.date) -> tuple[dt.date, dt.date]:
 # Variables dinámicas desde Earth Engine
 # --------------------------------------------------------------------------
 def _capas_cambio(t, region) -> dict:
-    """Capas de cambio a resolución nativa (Sentinel-2 a 10-20 m, Sentinel-1 a 10 m)
-    para la fecha de corte «t» (ee.Date)."""
+    """Capas de cambio a resolución nativa para la fecha de corte «t» (ee.Date).
+
+    Vegetación (Sentinel-2, 10-20 m), dos comparaciones:
+      - reciente: últimos 12 días frente a los 30 días anteriores;
+      - mensual: últimos 30 días frente a los 90 días anteriores.
+      Un píxel tiene cambio si en alguna de las dos cae el NDVI más de 0,15, sube
+      el índice de suelo desnudo más de 0,05, antes había vegetación densa
+      (NDVI > 0,5) y está en ladera (pendiente >= 10°).
+    Radar (Sentinel-1, VH, 10 m): solo se comparan imágenes de la misma órbita.
+      La mediana de los últimos 12 días se compara con las de los 30, 60 y 90
+      días anteriores; hay cambio si la diferencia supera 2 dB en las tres
+      comparaciones y con el mismo signo (cambio persistente, no ruido).
+    """
     import ee
 
     slope = ee.Terrain.slope(ee.Image("NASA/NASADEM_HGT/001").select("elevation"))
@@ -109,22 +120,50 @@ def _capas_cambio(t, region) -> dict:
           .filterDate(t.advance(-120, "day"), t)
           .filter(ee.Filter.lt("CLOUDY_PIXEL_PERCENTAGE", 90))
           .linkCollection(csp, ["cs_cdf"]).map(_limpia))
-    antes = s2.filterDate(t.advance(-120, "day"), t.advance(-30, "day")).median()
-    ahora = s2.filterDate(t.advance(-30, "day"), t).median()
-    dn = ahora.select("ndvi").subtract(antes.select("ndvi"))
-    db = ahora.select("bsi").subtract(antes.select("bsi"))
-    cam_opt = (dn.lt(-0.15).And(db.gt(0.05)).And(antes.select("ndvi").gt(0.5))
+
+    def _comparacion(d_ahora, d_antes):
+        antes = s2.filterDate(t.advance(-(d_ahora + d_antes), "day"),
+                              t.advance(-d_ahora, "day")).median()
+        ahora = s2.filterDate(t.advance(-d_ahora, "day"), t).median()
+        dn = ahora.select("ndvi").subtract(antes.select("ndvi"))
+        db = ahora.select("bsi").subtract(antes.select("bsi"))
+        cam = (dn.lt(-0.15).And(db.gt(0.05)).And(antes.select("ndvi").gt(0.5))
                .And(ladera).unmask(0, False))
-    valido = dn.mask().gt(0).unmask(0, False)
+        return dn, cam
+
+    dn12, cam12 = _comparacion(12, 30)
+    dn30, cam30 = _comparacion(30, 90)
+    cam_opt = cam12.Or(cam30)
+    # caída de NDVI más fuerte de las dos comparaciones (para ubicar el punto)
+    dn = ee.ImageCollection([dn12.rename("d"), dn30.rename("d")]).min()
+    valido = dn30.mask().gt(0).unmask(0, False)
 
     s1 = (ee.ImageCollection("COPERNICUS/S1_GRD").filterBounds(region)
           .filter(ee.Filter.eq("instrumentMode", "IW"))
           .filter(ee.Filter.listContains("transmitterReceiverPolarisation", "VH"))
+          .filterDate(t.advance(-102, "day"), t)
           .select("VH"))
-    dvh = (s1.filterDate(t.advance(-12, "day"), t).median()
-           .subtract(s1.filterDate(t.advance(-102, "day"), t.advance(-12, "day")).median()))
-    cam_rad = dvh.abs().gt(2).And(ladera).unmask(0, False)
-    return {"slope": slope, "dn": dn, "dvh": dvh, "cam_opt": cam_opt,
+    orbitas = (s1.filterDate(t.advance(-12, "day"), t)
+               .aggregate_array("relativeOrbitNumber_start").distinct())
+
+    def _por_orbita(o):
+        so = s1.filter(ee.Filter.eq("relativeOrbitNumber_start", o))
+        ahora = so.filterDate(t.advance(-12, "day"), t).median()
+        d = [ahora.subtract(so.filterDate(t.advance(-(12 + k), "day"),
+                                          t.advance(-12, "day")).median())
+             for k in (30, 60, 90)]
+        fuerte = d[0].abs().gt(2).And(d[1].abs().gt(2)).And(d[2].abs().gt(2))
+        mismo = d[0].gt(0).eq(d[1].gt(0)).And(d[1].gt(0).eq(d[2].gt(0)))
+        cam = fuerte.And(mismo).unmask(0, False)
+        mag = d[0].abs().min(d[1].abs()).min(d[2].abs()).unmask(0, False)
+        return cam.rename("cam").addBands(mag.rename("mag")).toFloat()
+
+    rad = ee.ImageCollection(orbitas.map(_por_orbita))
+    rad = ee.Image(ee.Algorithms.If(rad.size().gt(0),
+                                    rad.qualityMosaic("mag"),
+                                    ee.Image.constant([0, 0]).rename(["cam", "mag"]).toFloat()))
+    cam_rad = rad.select("cam").gt(0).And(ladera).unmask(0, False)
+    return {"slope": slope, "dn": dn, "dvh": rad.select("mag"), "cam_opt": cam_opt,
             "cam_rad": cam_rad, "valido": valido}
 
 
@@ -222,6 +261,19 @@ except Exception:  # noqa: BLE001
     calificar_semana = calificar
 
 
+CLASES_IGAC = [(3, "Ligeramente plano"), (7, "Ligeramente inclinado"),
+               (12, "Moderadamente inclinado"), (25, "Fuertemente inclinado"),
+               (50, "Moderadamente escarpado"), (75, "Escarpado"), (1e9, "Muy escarpado")]
+
+
+def clase_pendiente_igac(pct: float) -> str:
+    """Clase de pendiente del IGAC (pendiente en porcentaje)."""
+    for lim, nom in CLASES_IGAC:
+        if pct <= lim:
+            return nom
+    return CLASES_IGAC[-1][1]
+
+
 def _clase_susc(v: float) -> str:
     cortes = meta()["cortes_susc"]  # en % de probabilidad del modelo de susceptibilidad
     nombres = ["Muy baja", "Baja", "Media", "Alta", "Muy alta"]
@@ -246,6 +298,7 @@ def sectores(cal: dict, codigo: str | None = None) -> pd.DataFrame:
         "lat": g["lat"][ii, jj].round(4), "lon": g["lon"][ii, jj].round(4),
         "prob": prob[ii, jj],
         "susceptibilidad": [_clase_susc(float(g["susc"][i, j])) for i, j in zip(ii, jj)],
+        "pendiente_pct": (100 * np.tan(np.radians(g["pend"][ii, jj]))).round(0),
         "lluvia_30d_mm": din["im_mes"][ii, jj].round(0),
         "lluvia_max7d_mm": din["im_max7d"][ii, jj].round(0),
         "anomalia_lluvia": din["im_anom"][ii, jj].round(2),
@@ -258,6 +311,7 @@ def sectores(cal: dict, codigo: str | None = None) -> pd.DataFrame:
     df["nivel"] = np.where(df["prob"] >= cal["umbral_prioritario"], NIVELES[0], NIVELES[1])
     df["evidencia_cambio"] = ((df["cambio_cobertura_pct"] >= 100 * cal.get("umbral_cambio_opt", 0.05))
                               | (df["cambio_radar_pct"] >= 100 * cal.get("umbral_cambio_rad", 0.15)))
+    df["pendiente_igac"] = df["pendiente_pct"].map(clase_pendiente_igac)
     df["exposicion"] = df.apply(_texto_exposicion, axis=1)
     df["mensaje"] = TEXTO
     return df.sort_values(["prob"], ascending=False).reset_index(drop=True)
@@ -312,9 +366,8 @@ def _puntos_bloque(fecha: str, celdas: list[tuple[int, int]]) -> list[dict]:
     # vegetación y suelo expuesto (prioridad, mayor caída de NDVI) o con cambio en radar
     # tras suavizar el moteado (mayor |ΔVH|). Candidato por terreno: píxel de mayor pendiente.
     optc = c["cam_opt"].focalMean(15, "circle", "meters").gte(0.5)
-    dvhs = c["dvh"].focalMean(30, "circle", "meters")
-    radc = dvhs.abs().gt(2).And(c["slope"].gte(10)).unmask(0, False)
-    punt = (ee.Image(0).where(radc, ee.Image(1000).add(dvhs.unmask(0, False).abs()))
+    radc = c["cam_rad"].focalMean(15, "circle", "meters").gte(0.5)
+    punt = (ee.Image(0).where(radc, ee.Image(1000).add(c["dvh"]))
             .where(optc, ee.Image(2000).add(c["dn"].unmask(0, False).multiply(-100)))
             .toFloat())
     pend = c["slope"].toFloat()
@@ -389,16 +442,17 @@ def agregar_puntos(df: pd.DataFrame, fecha: str, max_n: int = 1500) -> pd.DataFr
     return out
 
 
-def capa_cambio_url(fecha: str, bounds: tuple) -> str:
-    """URL de teselas con los píxeles de cambio (rojo: Sentinel-2; azul: Sentinel-1)."""
+def capa_cambio_url(fecha: str, codigo: str) -> str:
+    """URL de teselas con los píxeles de cambio dentro del municipio (o del
+    departamento): rojo, pérdida de vegetación (Sentinel-2); azul, cambio
+    persistente en radar (Sentinel-1). Solo grupos de píxeles, no píxeles sueltos."""
     import ee
+    from src.monitoreo import _geom
 
-    (la0, lo0), (la1, lo1) = bounds
-    region = ee.Geometry.Rectangle([lo0, la0, lo1, la1])
-    c = _capas_cambio(ee.Date(fecha), region)
+    region = _geom(codigo)
+    c = _capas_cambio(ee.Date(fecha), region.bounds())
     optc = c["cam_opt"].focalMean(15, "circle", "meters").gte(0.5)
-    radc = (c["dvh"].focalMean(30, "circle", "meters").abs().gt(2)
-            .And(c["slope"].gte(10)).unmask(0, False))
+    radc = c["cam_rad"].focalMean(15, "circle", "meters").gte(0.5)
     img = radc.multiply(1).where(optc, 2).selfMask().clip(region)
     return img.getMapId({"min": 1, "max": 2, "palette": ["2f6fdf", "ff1f1f"]})["tile_fetcher"].url_format
 
@@ -407,3 +461,76 @@ try:
     capa_cambio_semana = _st.cache_data(ttl=6 * 3600, show_spinner=False)(capa_cambio_url)
 except Exception:  # noqa: BLE001
     capa_cambio_semana = capa_cambio_url
+
+
+# --------------------------------------------------------------------------
+# Sitios conocidos con cambio satelital en la semana
+# --------------------------------------------------------------------------
+RADIO_SITIO_M = 100      # radio alrededor de cada sitio conocido
+UMBRAL_SITIO = 0.10      # fracción mínima del círculo con cambio
+MAX_SITIOS = 20          # máximo de sitios destacados por municipio
+
+
+def _cambio_sitios_bloque(fecha: str, filas: list[tuple[int, float, float]]) -> list[dict]:
+    import ee
+
+    lons = [f[2] for f in filas]
+    lats = [f[1] for f in filas]
+    region = ee.Geometry.Rectangle([min(lons) - 0.01, min(lats) - 0.01,
+                                    max(lons) + 0.01, max(lats) + 0.01])
+    c = _capas_cambio(ee.Date(fecha), region)
+    optc = c["cam_opt"].focalMean(15, "circle", "meters").gte(0.5)
+    radc = c["cam_rad"].focalMean(15, "circle", "meters").gte(0.5)
+    img = ee.Image.cat([optc.Or(radc).rename("total"), optc.rename("opt"),
+                        radc.rename("rad")]).toFloat()
+    fc = ee.FeatureCollection([
+        ee.Feature(ee.Geometry.Point([lon, lat]).buffer(RADIO_SITIO_M), {"pid": pid})
+        for pid, lat, lon in filas])
+    red = img.reduceRegions(collection=fc, reducer=ee.Reducer.mean(), scale=10,
+                            tileScale=4)
+    return [{"pid": int(f["properties"]["pid"]),
+             "f_cambio": f["properties"].get("total") or 0.0,
+             "f_opt": f["properties"].get("opt") or 0.0,
+             "f_rad": f["properties"].get("rad") or 0.0}
+            for f in red.getInfo()["features"]]
+
+
+def cambio_sitios(fecha: str) -> pd.DataFrame:
+    """Fracción del círculo de 100 m alrededor de cada sitio conocido con pérdida de
+    vegetación (Sentinel-2) o cambio persistente en radar (Sentinel-1)."""
+    from src import susceptibilidad as sus
+
+    pts = sus.puntos()
+    filas = list(zip(pts["pid"].astype(int), pts["lat"].astype(float), pts["lon"].astype(float)))
+    filas.sort(key=lambda f: (round(f[1], 1), f[2]))
+    lotes = [filas[k:k + 120] for k in range(0, len(filas), 120)]
+    with ThreadPoolExecutor(max_workers=4) as ex:
+        res = list(ex.map(lambda l: _cambio_sitios_bloque(fecha, l), lotes))
+    return pd.DataFrame([r for lote in res for r in lote],
+                        columns=["pid", "f_cambio", "f_opt", "f_rad"])
+
+
+try:
+    cambio_sitios_semana = _st.cache_data(ttl=6 * 3600, show_spinner=False)(cambio_sitios)
+except Exception:  # noqa: BLE001
+    cambio_sitios_semana = cambio_sitios
+
+
+def sitios_semana(fecha: str, codigo: str | None = None, max_n: int = MAX_SITIOS) -> pd.DataFrame:
+    """Sitios conocidos destacados en la semana: solo los que tienen cambio satelital
+    en al menos el 10 % del círculo de 100 m. Máximo «max_n» por municipio, ordenados
+    por la magnitud del cambio y, en empate, por el índice de atención."""
+    from src import susceptibilidad as sus
+
+    pts = sus.puntos(codigo)
+    if pts.empty:
+        return pts
+    cam = cambio_sitios_semana(fecha)
+    df = pts.merge(cam, on="pid", how="left").fillna({"f_cambio": 0, "f_opt": 0, "f_rad": 0})
+    df = df[df["f_cambio"] >= UMBRAL_SITIO]
+    df = df.sort_values(["f_cambio", "indice"], ascending=False)
+    df = df.groupby("codigo", group_keys=False).head(max_n)
+    df["cambio_detectado"] = np.select(
+        [(df["f_opt"] > 0) & (df["f_rad"] > 0), df["f_opt"] > 0],
+        ["Vegetación y radar", "Pérdida de vegetación"], "Radar")
+    return df.reset_index(drop=True)
