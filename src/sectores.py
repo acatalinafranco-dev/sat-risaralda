@@ -283,6 +283,7 @@ def resumen(cal: dict, codigo: str) -> dict:
         n_total = int((g["mun"] > 0).sum())
     return {
         "n_sectores": int(len(df)),
+        "n_total": n_total,
         "n_prioritarios": int((df["nivel"] == NIVELES[0]).sum()) if len(df) else 0,
         "pct_area": round(100 * len(df) / max(n_total, 1), 1),
         "n_con_cambio": int(df["evidencia_cambio"].sum()) if len(df) else 0,

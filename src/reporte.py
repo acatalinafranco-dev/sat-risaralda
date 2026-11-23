@@ -367,9 +367,10 @@ def _mensaje(nombre, res, pts, lluvia, cambio, sectores=None) -> str:
     if sectores and sectores.get("resumen"):
         r = sectores["resumen"]
         if r["n_sectores"]:
-            t += (f"En la semana analizada, {r['n_sectores']} sectores de 300 m "
-                  f"({_c(r['pct_area'])} % del municipio) reúnen condiciones de terreno y "
-                  "lluvia que sugieren hacer seguimiento y verificar cambios en el terreno"
+            t += (f"En la semana analizada, {r['n_sectores']} de los {r.get('n_total', 0)} "
+                  f"sectores de 300 m del municipio ({_c(r['pct_area'])} %) reúnen "
+                  "condiciones de terreno y lluvia que sugieren hacer seguimiento y "
+                  "verificar cambios en el terreno"
                   + (f"; {r['n_prioritarios']} con seguimiento prioritario" if r["n_prioritarios"] else "")
                   + ". ")
         else:
