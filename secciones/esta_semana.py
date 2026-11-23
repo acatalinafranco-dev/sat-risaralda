@@ -80,10 +80,15 @@ else:
     razon = ("la lluvia está dentro de lo habitual para la época"
              + (f" ({_c(a7)} mm en 7 días; {pct} % del promedio de 30 días)" if a7 is not None and pct is not None else ""))
 
+_ambito = "del departamento" if COD == "66" else "del municipio"
 frase = (f"En **{nombre_activo()}** {razon}. "
-         + (f"Hay **{rs['n_sectores']} sectores de 300 m** para seguimiento "
-            f"({_c(rs['pct_area'], 1)} % del territorio)" if rs else "")
-         + (f" y **{len(prio)} sitios conocidos** en seguimiento prioritario." if len(prio) else "."))
+         + (f"Esta semana, **{_c(rs['n_sectores'])} de los {_c(rs.get('n_total', 0))} sectores** "
+            f"de 300 m {_ambito} ({_c(rs['pct_area'], 1)} %) quedaron para seguimiento "
+            f"por terreno y lluvia"
+            + (f"; **{_c(rs['n_prioritarios'])}** de ellos en seguimiento prioritario. "
+               if rs["n_prioritarios"] else ". ") if rs else "")
+         + (f"Aparte, de los **{_c(len(pts))} sitios** con movimientos en masa ya registrados, "
+            f"**{_c(len(prio))}** están en seguimiento prioritario." if len(prio) else ""))
 st.markdown(
     f"""<div style="border-left:10px solid {color}; background:#fafafa; padding:14px 18px;
     border-radius:8px; margin-bottom:10px;">
