@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-st.set_page_config(page_title="SAT Risaralda · Movimientos en masa", page_icon="🛰️",
+st.set_page_config(page_title="Monitoreo satelital Risaralda · Movimientos en masa", page_icon="🛰️",
                    layout="wide", initial_sidebar_state="expanded")
 
 paginas = [
