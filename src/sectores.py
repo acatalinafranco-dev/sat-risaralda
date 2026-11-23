@@ -203,6 +203,14 @@ def calificar(fecha: str) -> dict:
             "umbral_cambio_opt": u_opt, "umbral_cambio_rad": u_rad}
 
 
+try:  # caché compartida por las páginas de la app (6 horas)
+    import streamlit as _st
+
+    calificar_semana = _st.cache_data(ttl=6 * 3600, show_spinner=False)(calificar)
+except Exception:  # noqa: BLE001
+    calificar_semana = calificar
+
+
 def _clase_susc(v: float) -> str:
     cortes = meta()["cortes_susc"]  # en % de probabilidad del modelo de susceptibilidad
     nombres = ["Muy baja", "Baja", "Media", "Alta", "Muy alta"]
