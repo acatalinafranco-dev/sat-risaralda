@@ -1,10 +1,8 @@
-"""Página: Índices de vegetación · monitoreo de movimientos en masa.
+"""Página: vegetación · estado actual y pérdida de vegetación en un solo mapa.
 
-  1. Mapa del índice actual (NDVI / NDMI / BSI) sobre el polígono seleccionado.
-  2. Detección de cambios ΔNDVI (referencia vs. período reciente): la pérdida
-     abrupta de vegetación en laderas es indicador de cicatrices de
-     deslizamiento, remoción de cobertura o intervención antrópica.
-  3. Serie temporal mensual del NDVI medio.
+El mapa combina el NDVI del período reciente (estado actual) con la pérdida de
+vegetación frente a un período de referencia (capa magenta). La serie mensual
+de NDVI se calcula solo si el usuario la pide, porque es la consulta más lenta.
 """
 from __future__ import annotations
 
@@ -21,28 +19,29 @@ from src import gee_indices as gx
 from src.ui import (cache_mun, agregar_contorno, ajustar_al_municipio, conectar_gee,
                     encabezado, leyenda_continua, mapa_base, pie_institucional)
 
-st.set_page_config(page_title="Vegetación · SAT Risaralda", layout="wide",
+st.set_page_config(page_title="Vegetación · Monitoreo satelital Risaralda", layout="wide",
                    page_icon="🌿", initial_sidebar_state="expanded")
 
 encabezado(
-    "🌿 Índices de vegetación · {mun}",
-    "Monitoreo de la cobertura vegetal con Sentinel-2 (máscara de nubes "
-    "Cloud Score+): "
+    "🌿 Vegetación · {mun}",
+    "Estado actual de la vegetación y zonas donde **se perdió vegetación** en ladera "
+    "(imágenes Sentinel-2 sin nubes).",
 )
 
 if not conectar_gee():
     st.stop()
 
 
-# Las excepciones no se cachean: un error transitorio no queda pegado.
 @cache_mun(ttl=3600)
-def _mapa_indice(indice, f0, f1):
-    return gx.mapa_indice(indice, f0, f1)
+def _mapa(a0, a1, r0, r1, umbral):
+    d = gx.mapa_vegetacion(a0, a1, r0, r1, umbral)
+    d.pop("_perdida", None)
+    return d
 
 
 @cache_mun(ttl=3600)
-def _cambio(r0, r1, a0, a1, umbral):
-    return gx.mapa_cambio_ndvi(r0, r1, a0, a1, umbral)
+def _area(a0, a1, r0, r1, umbral):
+    return gx.area_perdida_ha(a0, a1, r0, r1, umbral)
 
 
 @cache_mun(ttl=86400)
@@ -50,149 +49,95 @@ def _serie_ndvi(meses, fecha_consulta):
     return gx.serie_ndvi_mensual(meses)
 
 
-def _seguro(fn, *args):
-    try:
-        return fn(*args)
-    except Exception as exc:
-        return {"__error__": str(exc)}
-
-
 hoy = dt.date.today()
+DIAS = {"Últimos 30 días": 30, "Últimos 60 días": 60, "Últimos 90 días": 90}
+REF = {"Hace 3 a 6 meses": (180, 90), "Hace 6 a 12 meses": (365, 180),
+       "Hace 12 a 24 meses": (730, 365)}
 
-# --------------------------------------------------------------------------
-# 1) Índice actual
-# --------------------------------------------------------------------------
-st.markdown("### Estado actual de la vegetación")
+with st.expander("¿Cómo funciona este mapa?", expanded=False):
+    st.markdown("""
+**Fondo de colores (estado actual).** Es el índice de vegetación NDVI del período
+reciente: verde intenso = vegetación vigorosa; amarillo = vegetación escasa; pardo =
+suelo desnudo, roca o construcciones.
 
-c1, c2 = st.columns(2)
-with c1:
-    indice = st.selectbox(
-        "Índice", ["NDVI", "NDMI", "BSI"],
-        format_func=lambda k: {
-            "NDVI": "NDVI · vigor de la vegetación",
-            "NDMI": "NDMI · humedad de la vegetación",
-            "BSI": "BSI · suelo desnudo",
-        }[k],
-    )
-with c2:
-    ventana = st.selectbox("Período del compuesto",
-                           ["Últimos 30 días", "Últimos 60 días", "Últimos 90 días"],
-                           index=1,
-                           help="Compuesto mediano libre de nubes del período")
-DIAS_V = {"Últimos 30 días": 30, "Últimos 60 días": 60, "Últimos 90 días": 90}
-f0 = (hoy - dt.timedelta(days=DIAS_V[ventana])).isoformat()
-f1 = (hoy + dt.timedelta(days=1)).isoformat()
+**Capa magenta (pérdida de vegetación).** Marca los lugares donde el NDVI bajó más que el
+umbral elegido entre el período de referencia y el reciente. Para evitar falsas alarmas,
+solo se marca un lugar si cumple todo lo siguiente:
 
-with st.spinner(f"Generando compuesto {indice} ({ventana.lower()})..."):
-    res = _seguro(_mapa_indice, indice, f0, f1)
+1. Antes tenía vegetación (NDVI mayor a 0,4).
+2. Está en ladera (pendiente de 10° o más), para descartar cosechas en zonas planas.
+3. Forma un grupo de píxeles (al menos la mitad de los píxeles en un radio de 15 m),
+   para descartar píxeles sueltos.
+4. Las imágenes usadas no tienen nubes ni sombras (máscara Cloud Score+).
 
-if res.get("__error__"):
-    st.warning(f"No fue posible generar el índice: {res['__error__']}")
-else:
+**Filtros que puede cambiar**
+- **Período reciente:** imágenes de los últimos 30, 60 o 90 días. Con más días hay menos
+  vacíos por nubes, pero el cambio puede ser más antiguo.
+- **Período de referencia:** con qué momento se compara.
+- **Umbral de pérdida:** qué tanto debe bajar el NDVI. Más negativo = solo cambios fuertes.
+
+**Cómo interpretarlo.** La pérdida de vegetación puede deberse a un movimiento en masa,
+pero también a cosechas, quemas, talas u obras. Verifique con la imagen en color real
+(«Imágenes y radar») o en campo.
+""")
+
+c1, c2, c3 = st.columns(3)
+act = c1.selectbox("Período reciente", list(DIAS), index=1)
+ref = c2.selectbox("Período de referencia", list(REF), index=1)
+umbral = c3.slider("Umbral de pérdida (caída del NDVI)", -0.5, -0.1, -0.2, 0.05,
+                   help="Más negativo = solo pérdidas más fuertes")
+a0 = (hoy - dt.timedelta(days=DIAS[act])).isoformat()
+a1 = (hoy + dt.timedelta(days=1)).isoformat()
+r0 = (hoy - dt.timedelta(days=REF[ref][0])).isoformat()
+r1 = (hoy - dt.timedelta(days=REF[ref][1])).isoformat()
+
+with st.spinner("Preparando el mapa de vegetación..."):
+    try:
+        res = _mapa(a0, a1, r0, r1, umbral)
+    except Exception as exc:  # noqa: BLE001
+        res = None
+        st.warning(f"No fue posible generar el mapa: {exc}")
+
+if res:
     m = mapa_base(zoom=12, basemap="Esri.WorldImagery")
-    m.add_tile_layer(res["tiles_url"], name=f"{indice} · {ventana}",
+    m.add_tile_layer(res["tiles_ndvi"], name="Estado actual (NDVI)",
+                     attribution="Google Earth Engine / Copernicus", opacity=0.75)
+    m.add_tile_layer(res["tiles_perdida"], name="Pérdida de vegetación",
                      attribution="Google Earth Engine / Copernicus")
     agregar_contorno(m)
     ajustar_al_municipio(m)
-    m.to_streamlit(height=520)
+    m.to_streamlit(height=560)
+    leyenda_continua("Estado actual de la vegetación (NDVI): suelo desnudo → vegetación vigorosa",
+                     res["vis_ndvi"])
+    st.markdown(
+        "<span style='display:inline-block;width:14px;height:14px;background:#ff00ff;"
+        "margin:0 6px -2px 0'></span><b>Magenta: pérdida de vegetación</b> entre "
+        f"{ref.lower()} y los {act.lower()} (caída del NDVI mayor a {abs(umbral):.2f})",
+        unsafe_allow_html=True)
+    if st.button("Calcular el área con pérdida de vegetación"):
+        with st.spinner("Calculando el área..."):
+            try:
+                st.metric("Área con pérdida de vegetación", f"{_area(a0, a1, r0, r1, umbral):,.1f} ha")
+            except Exception as exc:  # noqa: BLE001
+                st.warning(f"No fue posible calcular el área: {exc}")
 
-    k1, k2, k3 = st.columns(3)
-    k1.metric(f"{indice} medio (polígono)", f"{res['media']:.3f}")
-    k2.metric("Mínimo", f"{res['min']:.3f}")
-    k3.metric("Máximo", f"{res['max']:.3f}")
-    leyenda_continua(f"{indice} · {ventana.lower()}", res["vis"])
-    st.caption(res["descripcion"])
-
-# --------------------------------------------------------------------------
-# 2) Detección de cambios ΔNDVI
-# --------------------------------------------------------------------------
-st.divider()
-st.markdown("### Detección de cambios (ΔNDVI) · posibles movimientos en masa")
-st.caption(
-    "Compara un período de **referencia** con uno **reciente**. Las zonas en "
-    "magenta perdieron vegetación densa de forma severa: revíselas contra la "
-    "imagen en color real de la página *Imágenes satelitales* antes de emitir "
-    "cualquier decisión."
-)
-
-cc1, cc2, cc3 = st.columns(3)
-with cc1:
-    ref = st.selectbox("Período de referencia",
-                       ["Hace 6–12 meses", "Hace 3–6 meses", "Año anterior (12–24 meses)"])
-with cc2:
-    act = st.selectbox("Período reciente", ["Últimos 60 días", "Últimos 90 días"])
-with cc3:
-    umbral = st.slider("Umbral de pérdida (ΔNDVI)", -0.5, -0.1, -0.2, 0.05,
-                       help="Más negativo = solo cambios más severos")
-
-RANGOS_REF = {
-    "Hace 6–12 meses": (365, 180),
-    "Hace 3–6 meses": (180, 90),
-    "Año anterior (12–24 meses)": (730, 365),
-}
-d_ini, d_fin = RANGOS_REF[ref]
-r0 = (hoy - dt.timedelta(days=d_ini)).isoformat()
-r1 = (hoy - dt.timedelta(days=d_fin)).isoformat()
-a0 = (hoy - dt.timedelta(days=DIAS_V.get(act, 60))).isoformat()
-a1 = (hoy + dt.timedelta(days=1)).isoformat()
-
-with st.spinner("Calculando cambio de NDVI (dos compuestos S2)..."):
-    cambio = _seguro(_cambio, r0, r1, a0, a1, umbral)
-
-if cambio.get("__error__"):
-    st.warning(f"No fue posible calcular el cambio: {cambio['__error__']}")
-else:
-    m2 = mapa_base(zoom=12, basemap="Esri.WorldImagery")
-    m2.add_tile_layer(cambio["tiles_delta"], name="ΔNDVI (continuo)",
-                      attribution="GEE", opacity=0.65)
-    m2.add_tile_layer(cambio["tiles_perdida"],
-                      name=f"Pérdida severa (ΔNDVI < {umbral})",
-                      attribution="GEE")
-    agregar_contorno(m2)
-    ajustar_al_municipio(m2)
-    m2.to_streamlit(height=520)
-
-    st.metric(
-        "Área con pérdida severa de vegetación (dentro del polígono)",
-        f"{cambio['area_perdida_ha']:,.1f} ha",
-        help=f"Píxeles con ΔNDVI < {umbral} que antes tenían NDVI > 0.4",
-    )
-    leyenda_continua("ΔNDVI (pérdida ← → ganancia)", cambio["vis"])
-    st.caption(cambio["descripcion"])
-
-# --------------------------------------------------------------------------
-# 3) Serie temporal NDVI
-# --------------------------------------------------------------------------
-st.divider()
-st.markdown("### Serie temporal · NDVI medio del polígono seleccionado")
-
-meses = st.select_slider("Meses hacia atrás", options=[12, 18, 24, 36], value=24)
-
-with st.spinner("Calculando serie mensual de NDVI (puede tardar en la primera carga)..."):
-    serie = _seguro(_serie_ndvi, meses, hoy.isoformat())
-
-if isinstance(serie, dict) and serie.get("__error__"):
-    st.warning(f"Serie no disponible: {serie['__error__']}")
-elif not serie:
-    st.info("Sin datos suficientes de NDVI en el período.")
-else:
-    dfn = pd.DataFrame(serie)
-    fig = go.Figure(go.Scatter(
-        x=dfn["fecha"], y=dfn["ndvi"], mode="lines+markers",
-        line=dict(color="#2e8b3d", width=2), marker=dict(size=5),
-        name="NDVI medio",
-    ))
-    media = dfn["ndvi"].mean()
-    fig.add_hline(y=media, line_dash="dash", line_color="#888",
-                  annotation_text=f"media {media:.2f}")
-    fig.update_layout(height=360, xaxis_title="Mes",
-                      yaxis_title="NDVI medio",
-                      margin=dict(t=30, b=40, l=50, r=20))
-    st.plotly_chart(fig, use_container_width=True)
-    st.caption(
-        "Caídas sostenidas del NDVI (fuera de la estacionalidad "
-        "normal) ameritan revisión con ΔNDVI e imágenes en color real. "
-        "Meses muy nubosos pueden quedar sin dato."
-    )
+with st.expander("Serie mensual del NDVI (opcional, tarda en cargar)"):
+    meses = st.select_slider("Meses hacia atrás", options=[12, 18, 24, 36], value=24)
+    if st.button("Calcular la serie"):
+        with st.spinner("Calculando la serie mensual de NDVI..."):
+            try:
+                serie = _serie_ndvi(meses, hoy.isoformat())
+            except Exception as exc:  # noqa: BLE001
+                serie = None
+                st.warning(f"Serie no disponible: {exc}")
+        if serie:
+            dfn = pd.DataFrame(serie)
+            fig = go.Figure(go.Scatter(x=dfn["fecha"], y=dfn["ndvi"], mode="lines+markers",
+                                       line=dict(color="#2e8b3d", width=2), marker=dict(size=5)))
+            fig.update_layout(height=340, xaxis_title="Mes", yaxis_title="NDVI medio",
+                              margin=dict(t=20, b=40, l=50, r=20))
+            st.plotly_chart(fig, use_container_width=True)
+            st.caption("Caídas sostenidas fuera de la variación normal del año ameritan "
+                       "revisión. Meses muy nublados pueden quedar sin dato.")
 
 pie_institucional()

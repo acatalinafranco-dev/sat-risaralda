@@ -17,7 +17,7 @@ from src.comparativo_cache import comparativo_compartido
 from src.gee_session import es_departamento, nombre_activo
 from src.ui import VERDE_CARDER, conectar_gee, encabezado, pie_institucional
 
-st.set_page_config(page_title="Panel semanal · SAT Risaralda", layout="wide",
+st.set_page_config(page_title="Panel semanal · Monitoreo satelital Risaralda", layout="wide",
                    page_icon="🗓️", initial_sidebar_state="expanded")
 
 ASF = "https://api.daac.asf.alaska.edu/services/search/param"

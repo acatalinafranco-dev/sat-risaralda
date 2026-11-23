@@ -15,15 +15,14 @@ from src import sectores as sec
 from src.reporte import generar_reporte
 from src.ui import conectar_gee, encabezado, pie_institucional
 
-st.set_page_config(page_title="Reporte municipal · SAT Risaralda", layout="wide",
+st.set_page_config(page_title="Reporte municipal · Monitoreo satelital Risaralda", layout="wide",
                    page_icon="📄", initial_sidebar_state="expanded")
 
 encabezado(
-    "📄 Reporte informativo municipal",
-    "Documento en PDF para la **Alcaldía y el Consejo Municipal de Gestión del Riesgo "
-    "de Desastres**: mensaje principal, mapa de susceptibilidad con los sitios "
-    "priorizados, lluvia reciente, cambio de cobertura, acciones sugeridas y "
-    "sustento técnico. **Es informativo: no constituye una alerta.**",
+    "📄 Reporte semanal municipal",
+    "Documento en PDF con la situación de la semana: lluvia, sectores para seguimiento, "
+    "sitios conocidos con cambio detectado por satélite y acciones sugeridas. "
+    "**Es informativo: no constituye una alerta.**",
 )
 
 if not sus.disponible():
@@ -40,49 +39,21 @@ cod = st.selectbox("Municipio", codigos, index=defecto, format_func=lambda c: no
 nombre = nombres[cod]
 hoy = dt.date.today().isoformat()
 
-res = sus.resumen_municipio(cod)
-k1, k2, k3, k4 = st.columns(4)
-k1.metric("Sitios con movimiento confirmado", res["n_sitios"])
-k2.metric("En seguimiento prioritario", res["por_nivel"]["Seguimiento prioritario"])
-k3.metric("Susceptibilidad alta y muy alta", f"{res['alta_muy_alta']:.0f} % del área")
-k4.metric("Sitios con viviendas expuestas", res["con_viviendas"])
-
-incluir_cambio = st.toggle(
-    "Incluir el monitoreo satelital de cambios (modelo de cambio)",
-    value=mon.disponible_cambio(), disabled=not mon.disponible_cambio(),
-    help="Agrega las zonas con cambio reciente compatible con movimientos en masa. "
-         "Puede tardar 1 a 2 minutos la primera vez del día.")
-
-incluir_sect = st.toggle(
-    "Incluir los sectores para seguimiento de la semana (terreno + lluvia)",
-    value=sec.disponible(), disabled=not sec.disponible(),
-    help="Agrega una página con los sectores de 300 m que esta semana superan el umbral "
-         "de seguimiento. Puede tardar 1 a 2 minutos la primera vez.")
+st.caption("El reporte se prepara con la información de la semana que termina hoy. "
+           "La primera consulta del día puede tardar 2 a 3 minutos.")
 
 if st.button(f"Preparar el reporte de {nombre}", type="primary"):
     feats = geojson_municipios()["features"]
     f = next(x for x in feats if x["properties"]["codigo"] == cod)
     otros = [x["geometry"] for x in feats if x is not f]
     errores = []
-    with st.spinner("Consultando lluvia (IMERG y CHIRPS)..."):
+    with st.spinner("Consultando la lluvia (IMERG y CHIRPS)..."):
         try:
             lluvia = mon.lluvia_municipio(cod, hoy)
         except Exception as exc:  # noqa: BLE001
             lluvia, _ = None, errores.append(f"lluvia: {exc}")
-    with st.spinner("Calculando cambio de cobertura (Sentinel-2)..."):
-        try:
-            veg = mon.vegetacion_municipio(cod, hoy)
-        except Exception as exc:  # noqa: BLE001
-            veg, _ = None, errores.append(f"vegetación: {exc}")
-    cambio = None
-    if incluir_cambio:
-        with st.spinner("Aplicando el modelo de cambio satelital..."):
-            try:
-                cambio = mon.cambios_municipio(mon.cambios_recientes(hoy), cod)
-            except Exception as exc:  # noqa: BLE001
-                errores.append(f"monitoreo de cambios: {exc}")
     sectores = None
-    if incluir_sect:
+    if sec.disponible():
         with st.spinner("Calificando los sectores de la semana..."):
             try:
                 cal = sec.calificar_semana(hoy)
@@ -92,9 +63,14 @@ if st.button(f"Preparar el reporte de {nombre}", type="primary"):
                                                         max_n=28)}
             except Exception as exc:  # noqa: BLE001
                 errores.append(f"sectores de la semana: {exc}")
+    sitios = None
+    with st.spinner("Revisando cambios satelitales en los sitios conocidos..."):
+        try:
+            sitios = sec.sitios_semana(hoy, cod)
+        except Exception as exc:  # noqa: BLE001
+            errores.append(f"cambios en sitios conocidos: {exc}")
     with st.spinner("Armando el PDF..."):
-        pdf = generar_reporte(cod, nombre, f["geometry"], otros, lluvia, veg, cambio,
-                              sectores)
+        pdf = generar_reporte(cod, nombre, f["geometry"], otros, lluvia, sectores, sitios, hoy)
     st.session_state["_reporte"] = (cod, hoy, pdf)
     for e in errores:
         st.warning(f"No fue posible calcular {e}. El reporte indica «s/d» en ese campo.")
@@ -104,22 +80,18 @@ if st.session_state.get("_reporte", (None,))[0] == cod:
     st.download_button(f"Descargar el reporte de {nombre} (PDF)", pdf,
                        file_name=f"reporte_mm_{nombre.lower().replace(' ', '_')}_{fecha}.pdf",
                        mime="application/pdf")
-    st.success("Reporte listo. Revíselo antes de enviarlo: los sitios y niveles deben "
-               "confirmarse con la información de campo más reciente.")
+    st.success("Reporte listo. Revíselo antes de enviarlo.")
 
-with st.expander("Qué contiene el reporte"):
+with st.expander("¿Qué contiene el reporte?"):
     st.markdown("""
-1. **Página 1:** mensaje principal en lenguaje claro, cuatro indicadores, mapa de
-   susceptibilidad del municipio con los sitios críticos numerados y la tabla de
-   sitios priorizados (vereda o barrio, nivel, susceptibilidad, elementos expuestos,
-   coordenadas y fecha de la última visita).
-2. **Página 2:** lluvia diaria de los últimos 60 días frente a la referencia
-   histórica, visitas por año, mapa de cambio de vegetación, zonas con cambio
-   satelital reciente, acciones sugeridas por nivel, método, validación, límites,
-   fundamento en la Ley 1523 de 2012 y fuentes.
-3. **Anexo:** lista completa de sitios cuando no caben en la primera página.
-
-Los nombres de evaluadores y los datos personales de las fichas no se incluyen. La
-coordinación departamental se cita como fuente de la información de visitas.
+1. **Página 1 · La semana:** mensaje principal, cuatro indicadores (lluvia de 7 días,
+   lluvia de 30 días frente a lo habitual, sectores para seguimiento y sitios conocidos con
+   cambio), mapa y lista de los sitios conocidos donde el satélite detectó cambios esta
+   semana (máximo 20 por municipio).
+2. **Página 2 · Contexto:** lluvia diaria de los últimos 60 días frente a la referencia
+   histórica, evidencia satelital, acciones sugeridas, sustento técnico y fundamento en la
+   Ley 1523 de 2012.
+3. **Página 3 · Sectores de la semana:** mapa e indicadores de los sectores de 300 m para
+   seguimiento y tabla con el punto sugerido para verificar en cada uno.
 """)
 pie_institucional()

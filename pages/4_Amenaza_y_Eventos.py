@@ -26,7 +26,7 @@ from src.ui import (VERDE_CARDER, agregar_amenaza_sgc, agregar_contorno,
                     ajustar_al_municipio, cache_mun, conectar_gee, encabezado,
                     leyenda_continua, mapa_base, pie_institucional)
 
-st.set_page_config(page_title="Amenaza y eventos · SAT Risaralda",
+st.set_page_config(page_title="Amenaza y eventos · Monitoreo satelital Risaralda",
                    layout="wide", page_icon="⛰️",
                    initial_sidebar_state="expanded")
 

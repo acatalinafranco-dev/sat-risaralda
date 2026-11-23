@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from src import riesgo
 from src.ui import encabezado, pie_institucional
 
-st.set_page_config(page_title="Fuentes y referencias · SAT Risaralda", layout="wide",
+st.set_page_config(page_title="Fuentes y referencias · Monitoreo satelital Risaralda", layout="wide",
                    page_icon="📚", initial_sidebar_state="expanded")
 
 encabezado(

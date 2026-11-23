@@ -15,7 +15,7 @@ from src.gee_session import codigo_activo, es_departamento, lista_municipios
 from src.ui import (agregar_contorno, agregar_municipios, ajustar_al_municipio,
                     conectar_gee, encabezado, mapa_base, pie_institucional)
 
-st.set_page_config(page_title="Puntos de interés · SAT Risaralda", layout="wide",
+st.set_page_config(page_title="Puntos de interés · Monitoreo satelital Risaralda", layout="wide",
                    page_icon="📍", initial_sidebar_state="expanded")
 
 MAX_PUNTOS = 300

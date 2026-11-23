@@ -21,7 +21,7 @@ from src.gee_session import centro_activo, geojson_municipios
 from src.ui import (ESRI_IMAGERY_ATTR, ESRI_IMAGERY_URL, conectar_gee,
                     encabezado, pie_institucional)
 
-st.set_page_config(page_title="Zona de interés · SAT Risaralda", layout="wide",
+st.set_page_config(page_title="Zona de interés · Monitoreo satelital Risaralda", layout="wide",
                    page_icon="✏️", initial_sidebar_state="expanded")
 
 MAX_KM2 = 1500

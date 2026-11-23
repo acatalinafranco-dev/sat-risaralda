@@ -19,7 +19,7 @@ from src.gee_session import (bounds_municipio, codigo_activo, es_departamento,
 from src.ui import (ESRI_IMAGERY_ATTR, ESRI_IMAGERY_URL, conectar_gee, encabezado,
                     pie_institucional)
 
-st.set_page_config(page_title="Sectores semanales · SAT Risaralda", layout="wide",
+st.set_page_config(page_title="Sectores semanales · Monitoreo satelital Risaralda", layout="wide",
                    page_icon="🗺️", initial_sidebar_state="expanded")
 
 encabezado(
@@ -42,22 +42,45 @@ def _c(x, d=1):
     return f"{x:,.{d}f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
-with st.expander("Cómo se calcula y qué tan confiable es", expanded=False):
+with st.expander("¿Cómo se calcula?", expanded=False):
     st.markdown(f"""
-- **Unidad:** {M['unidad']}.
-- **Terreno:** {', '.join(M['variables']['terreno']).lower()}.
-- **Lluvia:** {', '.join(M['variables']['lluvia']).lower()}.
-- **Evidencia complementaria:** {'; '.join(M['variables']['evidencia_complementaria']).lower()}.
-- **Entrenamiento:** {M['entrenamiento']}
-- **Validación** (bloques espaciales de 5 km, mes a mes; sin el mes del sismo):
-  marcando el 10 % de los sectores con mayor calificación se habría señalado el
-  **{_c(V['captura_top10_sin_sismo'], 0)} %** de los eventos que luego visitó la
-  coordinación (AUC {_c(V['auc_sin_sismo'], 2)}). Con solo el terreno: {_c(V['solo_terreno']['captura_top10_sin_sismo'], 0)} %.
-  Con el umbral de seguimiento se marca en promedio el {_c(V['umbral_seguimiento']['area_media_pct'])} %
-  del departamento ({_c(V['umbral_seguimiento']['area_min_pct'])} % en meses secos y hasta
-  {_c(V['umbral_seguimiento']['area_max_pct'])} % en los más lluviosos).
-- {V['aporte_cambio']}
-- **Límites:** {' '.join(M['limites'])}
+**Unidad de análisis.** El departamento se divide en 39.510 cuadros de 300 m × 300 m
+(9 hectáreas), llamados sectores.
+
+**Qué se evalúa en cada sector**
+- **Terreno** (no cambia de una semana a otra): propensión del terreno según el modelo
+  propio, pendiente media, proporción del sector con pendiente escarpada, relieve, edad
+  de las rocas y distancia a fallas geológicas (Servicio Geológico Colombiano, 1:100.000).
+  La pendiente se expresa en las clases del IGAC.
+- **Lluvia** (cambia cada semana): lluvia acumulada en los últimos 30 días, lluvia
+  máxima en un día, lluvia máxima en 7 días seguidos y diferencia frente al promedio
+  2001–2020 de ese mes (satélite IMERG de la NASA).
+
+Con esas variables, un modelo estadístico (bosque aleatorio) asigna a cada sector una
+calificación. Los sectores con calificación alta quedan en **seguimiento** y los más
+altos, en **seguimiento prioritario**.
+
+**Evidencia satelital complementaria** (no cambia la calificación; ayuda a ubicar
+dónde mirar dentro del sector)
+- **Pérdida de vegetación con suelo expuesto** (Sentinel-2): se comparan los últimos
+  12 días con los 30 anteriores y los últimos 30 días con los 90 anteriores.
+- **Cambio persistente en radar** (Sentinel-1): se comparan solo imágenes de la misma
+  órbita; los últimos 12 días frente a los 30, 60 y 90 días anteriores. Se marca
+  cambio solo si aparece en las tres comparaciones.
+
+**¿Qué tan bien funciona?** Se probó con los movimientos en masa registrados entre
+enero de 2024 y agosto de 2026, sin contar el mes del sismo. Para cada mes se
+calcularon los sectores y se revisó si el lugar del evento había quedado marcado.
+Para evitar que el modelo «hiciera trampa», cada zona se evaluó con un modelo que no
+había visto datos de esa zona.
+
+- Marcando en promedio el **{_c(V['umbral_seguimiento']['area_media_pct'])} %** del
+  departamento, **{_c(V['umbral_seguimiento']['captura_sin_sismo_pct'], 0)} de cada 100
+  eventos** cayeron en un sector marcado.
+- Si solo se usara el terreno, sin la lluvia, el resultado sería menor: la lluvia
+  mejora la detección en unos 10 eventos de cada 100.
+- El área marcada cambia con la lluvia: cerca del {_c(V['umbral_seguimiento']['area_min_pct'])} %
+  en meses secos y hasta el {_c(V['umbral_seguimiento']['area_max_pct'])} % en los más lluviosos.
 """)
 
 hoy = dt.date.today()
@@ -105,7 +128,7 @@ folium.GeoJson(gj, name="Límite municipal",
                style_function=lambda f: {"color": "#ffffff", "weight": 1.6, "fill": False}).add_to(m)
 d = 0.00135  # media celda (~150 m) en grados
 try:
-    folium.TileLayer(sec.capa_cambio_semana(cal["fecha"], bounds_municipio()),
+    folium.TileLayer(sec.capa_cambio_semana(cal["fecha"], codigo),
                      attr="Copernicus Sentinel-1/2 · Google Earth Engine",
                      name="Píxeles con cambio (10 m)", overlay=True, show=True,
                      max_zoom=19).add_to(m)
@@ -116,7 +139,8 @@ fp = folium.FeatureGroup(name="Puntos de verificación", show=True)
 for _, s in df.head(1500).iterrows():
     expo = s["exposicion"] or "sin edificaciones ni vías cercanas identificadas"
     html = (f"<b>{s['nivel']}</b><br>{sec.TEXTO}<br><br>"
-            f"Susceptibilidad: {s['susceptibilidad']}<br>"
+            f"Propensión del terreno: {s['susceptibilidad']}<br>"
+            f"Pendiente media: {s['pendiente_pct']:.0f} % ({s['pendiente_igac']})<br>"
             f"Lluvia 30 días: {s['lluvia_30d_mm']:.0f} mm (anomalía {s['anomalia_lluvia']:.2f})<br>"
             f"Máx. 7 días: {s['lluvia_max7d_mm']:.0f} mm<br>"
             f"Cambio de cobertura: {s['cambio_cobertura_pct']:.1f} % del sector "
@@ -130,18 +154,29 @@ for _, s in df.head(1500).iterrows():
                      fill=True, fill_opacity=0.55,
                      popup=folium.Popup(html, max_width=300),
                      tooltip=f"{s['nivel']}").add_to(fg)
-    folium.CircleMarker([s["pv_lat"], s["pv_lon"]], radius=4, color="#000000", weight=1.2,
-                        fill=True, fill_color="#ffd400", fill_opacity=1,
+    folium.CircleMarker([s["pv_lat"], s["pv_lon"]], radius=3, stroke=False,
+                        fill=True, fill_color="#ffd400", fill_opacity=0.6,
                         popup=folium.Popup(html, max_width=300),
                         tooltip=f"Punto de verificación · {s['pv_criterio']}").add_to(fp)
+fp.add_to(m)  # los puntos van debajo de los sectores
 fg.add_to(m)
-fp.add_to(m)
 folium.LayerControl(collapsed=True).add_to(m)
 st_folium(m, height=560, use_container_width=True, returned_objects=[])
-st.caption("Rojo: seguimiento prioritario · Naranja: seguimiento. Borde grueso: hay cambio "
-           "de cobertura o en radar dentro del sector. Punto amarillo: lugar que conviene "
-           "verificar dentro del sector (píxel con cambio o, si no hay, el de mayor pendiente). "
-           "Píxeles rojos: pérdida de vegetación (Sentinel-2); azules: cambio en radar (Sentinel-1).")
+_sym = ("display:inline-block;width:13px;height:13px;margin:0 6px 0 14px;"
+        "vertical-align:-2px;")
+st.markdown(
+    "<div style='font-size:0.9rem;line-height:2'>"
+    f"<span style='{_sym}background:#c0392b;opacity:.75'></span>Sector en seguimiento prioritario"
+    f"<span style='{_sym}background:#e67e22;opacity:.75'></span>Sector en seguimiento"
+    f"<span style='{_sym}border-radius:50%;background:#ffd400;opacity:.6'></span>Punto sugerido para verificar"
+    "<br>"
+    f"<span style='{_sym}background:#ff1f1f'></span>Pérdida de vegetación (Sentinel-2)"
+    f"<span style='{_sym}background:#2f6fdf'></span>Cambio persistente en radar (Sentinel-1)"
+    f"<span style='{_sym}border:2.5px solid #555;background:none'></span>Borde grueso: el sector tiene cambio"
+    "</div>", unsafe_allow_html=True)
+st.caption("El punto sugerido está donde el satélite detectó cambio dentro del sector; si no hubo "
+           "cambio, en el lugar de mayor pendiente. Los píxeles de cambio se muestran solo "
+           "dentro del municipio.")
 
 st.markdown("### Sectores para seguimiento")
 if df.empty:
@@ -150,14 +185,16 @@ else:
     from src.gee_session import geojson_municipios as _gm
     nom = {f["properties"]["codigo"]: f["properties"]["nombre"] for f in _gm()["features"]}
     tab = df.assign(municipio=df["codigo"].map(nom))[
-        ["municipio", "nivel", "pv_lat", "pv_lon", "pv_criterio", "lat", "lon", "susceptibilidad", "lluvia_30d_mm",
+        ["municipio", "nivel", "pv_lat", "pv_lon", "pv_criterio", "lat", "lon", "susceptibilidad",
+         "pendiente_pct", "pendiente_igac", "lluvia_30d_mm",
          "lluvia_max7d_mm", "anomalia_lluvia", "cambio_cobertura_pct", "cambio_radar_pct",
          "exposicion"]].rename(columns={
             "municipio": "Municipio", "nivel": "Nivel",
             "pv_lat": "Latitud punto", "pv_lon": "Longitud punto",
             "pv_criterio": "Criterio del punto",
             "lat": "Latitud centro", "lon": "Longitud centro",
-            "susceptibilidad": "Susceptibilidad", "lluvia_30d_mm": "Lluvia 30 d (mm)",
+            "susceptibilidad": "Propensión del terreno", "pendiente_pct": "Pendiente media (%)",
+            "pendiente_igac": "Clase de pendiente (IGAC)", "lluvia_30d_mm": "Lluvia 30 d (mm)",
             "lluvia_max7d_mm": "Máx. 7 d (mm)", "anomalia_lluvia": "Anomalía",
             "cambio_cobertura_pct": "Cambio cobertura (%)", "cambio_radar_pct": "Cambio radar (%)",
             "exposicion": "Elementos expuestos"})

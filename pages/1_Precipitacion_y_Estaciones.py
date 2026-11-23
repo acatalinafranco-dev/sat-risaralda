@@ -9,7 +9,7 @@ import streamlit as st
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from src.vistas import mostrar_secciones
 
-st.set_page_config(page_title="Precipitación y estaciones · SAT Risaralda",
+st.set_page_config(page_title="Precipitación y estaciones · Monitoreo satelital Risaralda",
                    layout="wide", page_icon="🌧️", initial_sidebar_state="expanded")
 
 mostrar_secciones({
