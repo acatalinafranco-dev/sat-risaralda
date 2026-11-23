@@ -409,6 +409,14 @@ def figura_sectores(geom_mun: dict, df: pd.DataFrame) -> ImageReader:
     return _png(fig)
 
 
+def _crit(t) -> str:
+    if not t:
+        return "Centro"
+    t = str(t)
+    return ("Vegetación" if "Sentinel-2" in t else "Radar" if "Sentinel-1" in t
+            else "Pendiente" if "pendiente" in t else "Centro")
+
+
 def _pagina_sectores(c, nombre: str, sectores: dict, pag: int, geom_mun=None) -> int:
     from src import sectores as sec
 
@@ -429,7 +437,9 @@ def _pagina_sectores(c, nombre: str, sectores: dict, pag: int, geom_mun=None) ->
              f"el {vv['umbral_seguimiento']['area_media_pct']:.0f} % del departamento y señaló "
              f"el {vv['umbral_seguimiento']['captura_sin_sismo_pct']:.0f} % de los eventos "
              "visitados después (sin contar el sismo de agosto de 2026). El cambio de cobertura "
-             "(Sentinel-2) y de radar (Sentinel-1) se indica como evidencia complementaria.")
+             "(Sentinel-2) y de radar (Sentinel-1) se indica como evidencia complementaria. "
+             "Para cada sector se da un punto de verificación: el píxel de 10 m con cambio "
+             "detectado o, si no lo hay, el de mayor pendiente dentro del sector.")
     if geom_mun is not None:
         c.drawImage(figura_sectores(geom_mun, df), MX, y - 205, width=250, height=205,
                     preserveAspectRatio=True, anchor="nw")
@@ -455,16 +465,17 @@ def _pagina_sectores(c, nombre: str, sectores: dict, pag: int, geom_mun=None) ->
         filas = [[str(i + 1),
                   (s_["nivel"].replace("Seguimiento prioritario", "Prioritario"),
                    sec.COLOR_NIVEL[s_["nivel"]]),
-                  f"{s_['lat']:.4f}, {s_['lon']:.4f}", s_["susceptibilidad"],
+                  f"{s_.get('pv_lat', s_['lat']):.5f}, {s_.get('pv_lon', s_['lon']):.5f}",
+                  _crit(s_.get("pv_criterio")), s_["susceptibilidad"],
                   f"{s_['lluvia_30d_mm']:.0f} / {s_['lluvia_max7d_mm']:.0f}",
                   _c(s_["anomalia_lluvia"]),
                   ("Sí" if s_["evidencia_cambio"] else "No")
                   + ("" if s_["imagen_optica_valida_pct"] >= 50 else " (nubes)"),
                   s_["exposicion"] or "—"]
                  for i, s_ in df.iterrows()]
-        cab = ["N°", "Nivel", "Coordenadas (centro)", "Suscep.", "Lluvia 30 d / máx 7 d (mm)",
-               "Anomalía", "Cambio cobertura", "Expuestos"]
-        anchos = [20, 64, 86, 50, 92, 46, 62, UTIL - 420]
+        cab = ["N°", "Nivel", "Punto de verificación", "Criterio", "Suscep.",
+               "Lluvia 30 d / 7 d", "Anom.", "Cambio", "Expuestos"]
+        anchos = [18, 58, 92, 52, 44, 66, 32, 50, UTIL - 412]
         y = _tabla(c, MX, y, cab, filas, anchos, tam=6.4, alto_f=11.2)
         if n_tot > len(df):
             y = _parrafo(c, f"Se muestran los 28 sectores con mayor calificación de {n_tot}. "
@@ -473,7 +484,10 @@ def _pagina_sectores(c, nombre: str, sectores: dict, pag: int, geom_mun=None) ->
                          MX, y - 4, UTIL, tam=6.8, color=GRIS)
     y = _parrafo(c, "Reporte informativo de apoyo al seguimiento. No constituye una alerta: "
                     "las alertas hidrometeorológicas las emite el IDEAM. Los sectores indican "
-                    "dónde verificar, no el predio afectado.", MX, y - 6, UTIL, tam=6.8,
+                    "dónde verificar, no el predio afectado. Criterio del punto: «Vegetación», "
+                    "pérdida de vegetación y suelo expuesto (Sentinel-2); «Radar», cambio en "
+                    "Sentinel-1; «Pendiente», sin cambio detectado, píxel de mayor pendiente.",
+                 MX, y - 6, UTIL, tam=6.8,
                  color=GRIS)
     _pie(c)
     c.showPage()

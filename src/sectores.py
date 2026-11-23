@@ -85,10 +85,11 @@ def semana_de(fecha: dt.date) -> tuple[dt.date, dt.date]:
 # --------------------------------------------------------------------------
 # Variables dinámicas desde Earth Engine
 # --------------------------------------------------------------------------
-def _imagen_dinamica(fecha: str, region):
+def _capas_cambio(t, region) -> dict:
+    """Capas de cambio a resolución nativa (Sentinel-2 a 10-20 m, Sentinel-1 a 10 m)
+    para la fecha de corte «t» (ee.Date)."""
     import ee
 
-    t = ee.Date(fecha)
     slope = ee.Terrain.slope(ee.Image("NASA/NASADEM_HGT/001").select("elevation"))
     ladera = slope.gte(10)
     csp = ee.ImageCollection("GOOGLE/CLOUD_SCORE_PLUS/V1/S2_HARMONIZED")
@@ -123,6 +124,16 @@ def _imagen_dinamica(fecha: str, region):
     dvh = (s1.filterDate(t.advance(-12, "day"), t).median()
            .subtract(s1.filterDate(t.advance(-102, "day"), t.advance(-12, "day")).median()))
     cam_rad = dvh.abs().gt(2).And(ladera).unmask(0, False)
+    return {"slope": slope, "dn": dn, "dvh": dvh, "cam_opt": cam_opt,
+            "cam_rad": cam_rad, "valido": valido}
+
+
+def _imagen_dinamica(fecha: str, region):
+    import ee
+
+    t = ee.Date(fecha)
+    c = _capas_cambio(t, region)
+    cam_opt, cam_rad, valido = c["cam_opt"], c["cam_rad"], c["valido"]
 
     p60 = ee.Projection("EPSG:3116").atScale(60)
     p300 = ee.Projection("EPSG:3116").atScale(300)
@@ -230,6 +241,7 @@ def sectores(cal: dict, codigo: str | None = None) -> pd.DataFrame:
         return pd.DataFrame()
     cods = list(g["cods"])
     df = pd.DataFrame({
+        "fila": ii, "col": jj,
         "codigo": [cods[g["mun"][i, j] - 1] for i, j in zip(ii, jj)],
         "lat": g["lat"][ii, jj].round(4), "lon": g["lon"][ii, jj].round(4),
         "prob": prob[ii, jj],
@@ -276,3 +288,121 @@ def resumen(cal: dict, codigo: str) -> dict:
         "n_con_cambio": int(df["evidencia_cambio"].sum()) if len(df) else 0,
         "n_con_exposicion": int((df["exposicion"] != "").sum()) if len(df) else 0,
     }
+
+
+# --------------------------------------------------------------------------
+# Punto de verificación dentro de cada sector
+# --------------------------------------------------------------------------
+CRITERIO_PUNTO = {2: "Pérdida de vegetación y suelo expuesto (Sentinel-2)",
+                  1: "Cambio de retrodispersión en radar (Sentinel-1)",
+                  0: "Mayor pendiente del sector"}
+
+
+def _puntos_bloque(fecha: str, celdas: list[tuple[int, int]]) -> list[dict]:
+    import ee
+
+    ii = [c[0] for c in celdas]
+    jj = [c[1] for c in celdas]
+    xa, xb = X0 + RES * min(jj), X0 + RES * (max(jj) + 1)
+    ya, yb = Y0 - RES * (max(ii) + 1), Y0 - RES * min(ii)
+    region = ee.Geometry.Rectangle([xa, ya, xb, yb], "EPSG:3116", False)
+    c = _capas_cambio(ee.Date(fecha), region)
+    # Candidato por cambio: grupos de píxeles (no píxeles aislados) con pérdida de
+    # vegetación y suelo expuesto (prioridad, mayor caída de NDVI) o con cambio en radar
+    # tras suavizar el moteado (mayor |ΔVH|). Candidato por terreno: píxel de mayor pendiente.
+    optc = c["cam_opt"].focalMean(15, "circle", "meters").gte(0.5)
+    dvhs = c["dvh"].focalMean(30, "circle", "meters")
+    radc = dvhs.abs().gt(2).And(c["slope"].gte(10)).unmask(0, False)
+    punt = (ee.Image(0).where(radc, ee.Image(1000).add(dvhs.unmask(0, False).abs()))
+            .where(optc, ee.Image(2000).add(c["dn"].unmask(0, False).multiply(-100)))
+            .toFloat())
+    pend = c["slope"].toFloat()
+    ll = ee.Image.pixelLonLat()
+    img = ee.Image.cat([punt, ll, pend, pend, ll, pend])
+    red_ = (ee.Reducer.max(4).setOutputs(["c", "clon", "clat", "cpend"])
+            .combine(ee.Reducer.max(4).setOutputs(["s", "slon", "slat", "spend"]), None, False))
+    fc = ee.FeatureCollection([
+        ee.Feature(ee.Geometry.Rectangle([X0 + RES * j, Y0 - RES * (i + 1),
+                                          X0 + RES * (j + 1), Y0 - RES * i],
+                                         "EPSG:3116", False), {"i": i, "j": j})
+        for i, j in celdas])
+    red = img.reduceRegions(collection=fc, reducer=red_, scale=10, crs="EPSG:3116",
+                            tileScale=4)
+    out = []
+    for f in red.getInfo()["features"]:
+        q = f["properties"]
+        if q.get("s") is None:
+            continue
+        p = q.get("c") or 0
+        out.append({"fila": int(q["i"]), "col": int(q["j"]),
+                    "c_tipo": 2 if p >= 2000 else 1 if p >= 1000 else 0,
+                    "c_lon": round(q["clon"], 5), "c_lat": round(q["clat"], 5),
+                    "c_pend": round(q["cpend"], 0),
+                    "s_lon": round(q["slon"], 5), "s_lat": round(q["slat"], 5),
+                    "s_pend": round(q["spend"], 0)})
+    return out
+
+
+def puntos_verificacion(fecha: str, celdas: tuple[tuple[int, int], ...]) -> pd.DataFrame:
+    """Coordenadas del punto que conviene verificar dentro de cada sector de 300 m."""
+    celdas = sorted(celdas)
+    lotes = [celdas[k:k + 250] for k in range(0, len(celdas), 250)]
+    with ThreadPoolExecutor(max_workers=4) as ex:
+        res = list(ex.map(lambda l: _puntos_bloque(fecha, l), lotes))
+    filas = [r for lote in res for r in lote]
+    return pd.DataFrame(filas, columns=["fila", "col", "c_tipo", "c_lon", "c_lat", "c_pend",
+                                        "s_lon", "s_lat", "s_pend"])
+
+
+try:
+    puntos_semana = _st.cache_data(ttl=6 * 3600, show_spinner=False)(puntos_verificacion)
+except Exception:  # noqa: BLE001
+    puntos_semana = puntos_verificacion
+
+
+def agregar_puntos(df: pd.DataFrame, fecha: str, max_n: int = 1500) -> pd.DataFrame:
+    """Añade a la tabla de sectores el punto de verificación de los «max_n» primeros.
+    Si el cálculo falla, se usa el centro del sector."""
+    if df is None or df.empty:
+        return df
+    cab = df.head(max_n)
+    try:
+        pv = puntos_semana(fecha, tuple(zip(cab["fila"].tolist(), cab["col"].tolist())))
+        out = df.merge(pv, on=["fila", "col"], how="left")
+        # El punto de cambio se usa solo si el sector tiene evidencia de cambio esa semana
+        usa_c = out["evidencia_cambio"].astype(bool) & (out["c_tipo"].fillna(0) > 0)
+        out["pv_lat"] = np.where(usa_c, out["c_lat"], out["s_lat"])
+        out["pv_lon"] = np.where(usa_c, out["c_lon"], out["s_lon"])
+        out["pv_pend"] = np.where(usa_c, out["c_pend"], out["s_pend"])
+        out["pv_criterio"] = [CRITERIO_PUNTO[int(t)] if u else
+                              (CRITERIO_PUNTO[0] if np.isfinite(la) else None)
+                              for u, t, la in zip(usa_c, out["c_tipo"].fillna(0), out["s_lat"])]
+        out = out.drop(columns=["c_tipo", "c_lon", "c_lat", "c_pend", "s_lon", "s_lat",
+                                "s_pend"])
+    except Exception:  # noqa: BLE001
+        out = df.assign(pv_lon=np.nan, pv_lat=np.nan, pv_pend=np.nan, pv_criterio=None)
+    falta = out["pv_lat"].isna()
+    out.loc[falta, "pv_lat"] = out.loc[falta, "lat"]
+    out.loc[falta, "pv_lon"] = out.loc[falta, "lon"]
+    out.loc[falta, "pv_criterio"] = "Centro del sector (punto no calculado)"
+    return out
+
+
+def capa_cambio_url(fecha: str, bounds: tuple) -> str:
+    """URL de teselas con los píxeles de cambio (rojo: Sentinel-2; azul: Sentinel-1)."""
+    import ee
+
+    (la0, lo0), (la1, lo1) = bounds
+    region = ee.Geometry.Rectangle([lo0, la0, lo1, la1])
+    c = _capas_cambio(ee.Date(fecha), region)
+    optc = c["cam_opt"].focalMean(15, "circle", "meters").gte(0.5)
+    radc = (c["dvh"].focalMean(30, "circle", "meters").abs().gt(2)
+            .And(c["slope"].gte(10)).unmask(0, False))
+    img = radc.multiply(1).where(optc, 2).selfMask().clip(region)
+    return img.getMapId({"min": 1, "max": 2, "palette": ["2f6fdf", "ff1f1f"]})["tile_fetcher"].url_format
+
+
+try:
+    capa_cambio_semana = _st.cache_data(ttl=6 * 3600, show_spinner=False)(capa_cambio_url)
+except Exception:  # noqa: BLE001
+    capa_cambio_semana = capa_cambio_url
