@@ -194,8 +194,13 @@ def calificar(fecha: str) -> dict:
     p = modelo().predict_proba(X)[:, 1]
     prob = np.full((ALTO, ANCHO), np.nan, np.float32)
     prob[dentro] = p
+    # Evidencia de cambio: sector dentro del 5 % con mayor fracción de cambio en el
+    # departamento esa semana (y por encima de un mínimo absoluto).
+    u_opt = max(0.05, float(np.nanpercentile(din["f_cambio_opt"][dentro], 95)))
+    u_rad = max(0.15, float(np.nanpercentile(din["f_cambio_rad"][dentro], 95)))
     return {"fecha": fecha, "prob": prob, "din": din,
-            "umbral": m["umbral_seguimiento"], "umbral_prioritario": m["umbral_prioritario"]}
+            "umbral": m["umbral_seguimiento"], "umbral_prioritario": m["umbral_prioritario"],
+            "umbral_cambio_opt": u_opt, "umbral_cambio_rad": u_rad}
 
 
 def _clase_susc(v: float) -> str:
@@ -231,7 +236,8 @@ def sectores(cal: dict, codigo: str | None = None) -> pd.DataFrame:
         "dist_via_m": g["dist_via"][ii, jj].round(0),
     })
     df["nivel"] = np.where(df["prob"] >= cal["umbral_prioritario"], NIVELES[0], NIVELES[1])
-    df["evidencia_cambio"] = (df["cambio_cobertura_pct"] >= 2) | (df["cambio_radar_pct"] >= 5)
+    df["evidencia_cambio"] = ((df["cambio_cobertura_pct"] >= 100 * cal.get("umbral_cambio_opt", 0.05))
+                              | (df["cambio_radar_pct"] >= 100 * cal.get("umbral_cambio_rad", 0.15)))
     df["exposicion"] = df.apply(_texto_exposicion, axis=1)
     df["mensaje"] = TEXTO
     return df.sort_values(["prob"], ascending=False).reset_index(drop=True)
