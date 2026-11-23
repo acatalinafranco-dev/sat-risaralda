@@ -338,7 +338,7 @@ def _texto_umbral(m, lluvia) -> str:
     return t + u["desempeno"]
 
 
-def _mensaje(nombre, res, pts, lluvia, cambio) -> str:
+def _mensaje(nombre, res, pts, lluvia, cambio, sectores=None) -> str:
     np_ = res["por_nivel"]["Seguimiento prioritario"]
     t = (f"{nombre} registra {res['n_sitios']} sitios con movimiento en masa "
          f"confirmado en las visitas de la coordinación departamental y de las "
@@ -364,14 +364,128 @@ def _mensaje(nombre, res, pts, lluvia, cambio) -> str:
         t += (f"El monitoreo satelital identifica {cambio['n_zonas']} zonas con "
               "cambios recientes compatibles con movimientos en masa, que conviene "
               "verificar. ")
+    if sectores and sectores.get("resumen"):
+        r = sectores["resumen"]
+        if r["n_sectores"]:
+            t += (f"En la semana analizada, {r['n_sectores']} sectores de 300 m "
+                  f"({_c(r['pct_area'])} % del municipio) reúnen condiciones de terreno y "
+                  "lluvia que sugieren hacer seguimiento y verificar cambios en el terreno"
+                  + (f"; {r['n_prioritarios']} con seguimiento prioritario" if r["n_prioritarios"] else "")
+                  + ". ")
+        else:
+            t += ("En la semana analizada ningún sector supera el umbral de "
+                  "seguimiento por terreno y lluvia. ")
     return t
+
+
+def figura_sectores(geom_mun: dict, df: pd.DataFrame) -> ImageReader:
+    from src import sectores as sec
+
+    fig, ax = plt.subplots(figsize=(4.2, 3.6))
+    xs, ys = [], []
+    for a in _anillos(geom_mun):
+        ax.fill(a[:, 0], a[:, 1], color="#f2f2f2", zorder=1)
+        ax.plot(a[:, 0], a[:, 1], color="#555555", lw=1.0, zorder=3)
+        xs += list(a[:, 0]); ys += list(a[:, 1])
+    d = 0.00135
+    if df is not None and len(df):
+        for _, r in df.iloc[::-1].iterrows():
+            ax.add_patch(plt.Rectangle((r["lon"] - d, r["lat"] - d), 2 * d, 2 * d,
+                                       color=sec.COLOR_NIVEL[r["nivel"]], lw=0,
+                                       alpha=0.9, zorder=2))
+            if r["evidencia_cambio"]:
+                ax.add_patch(plt.Rectangle((r["lon"] - d, r["lat"] - d), 2 * d, 2 * d,
+                                           fill=False, ec="black", lw=0.6, zorder=2.5))
+    ax.set_xlim(min(xs) - 0.01, max(xs) + 0.01)
+    ax.set_ylim(min(ys) - 0.01, max(ys) + 0.01)
+    ax.set_aspect(1 / np.cos(np.radians(np.mean(ys))))
+    ax.set_xticks([]); ax.set_yticks([])
+    for sp in ax.spines.values():
+        sp.set_visible(False)
+    h = [plt.Rectangle((0, 0), 1, 1, color=sec.COLOR_NIVEL[n]) for n in sec.NIVELES]
+    h.append(plt.Rectangle((0, 0), 1, 1, fill=False, ec="black", lw=0.8))
+    ax.legend(h, sec.NIVELES + ["Con cambio de cobertura o radar"], loc="upper center",
+              bbox_to_anchor=(0.5, -0.01), ncol=2, fontsize=6.5, frameon=False)
+    return _png(fig)
+
+
+def _pagina_sectores(c, nombre: str, sectores: dict, pag: int, geom_mun=None) -> int:
+    from src import sectores as sec
+
+    df = sectores.get("tabla")
+    r = sectores.get("resumen") or {}
+    ms = sec.meta()
+    y = _encabezado(c, nombre, pag)
+    y -= 14
+    y = _titulo_seccion(c, f"Sectores para seguimiento · semana que termina el "
+                           f"{sectores.get('fecha', '')}", MX, y)
+    y = _parrafo(c, sec.TEXTO, MX, y, UTIL, fuente="Helvetica-Bold", tam=8, interlin=10) - 2
+    vv = ms["validacion"]
+    intro = (f"Sectores de 300 m calificados con el terreno (susceptibilidad, pendiente, "
+             "relieve, geología y fallas del SGC) y la lluvia satelital de los 30 días previos "
+             "(acumulado, máximos de 1 y 7 días y anomalía). Se marca «seguimiento» cuando la "
+             "calificación supera el umbral validado y «seguimiento prioritario» en el umbral "
+             f"superior. En la validación 2024-2026, el umbral de seguimiento marcó en promedio "
+             f"el {vv['umbral_seguimiento']['area_media_pct']:.0f} % del departamento y señaló "
+             f"el {vv['umbral_seguimiento']['captura_sin_sismo_pct']:.0f} % de los eventos "
+             "visitados después (sin contar el sismo de agosto de 2026). El cambio de cobertura "
+             "(Sentinel-2) y de radar (Sentinel-1) se indica como evidencia complementaria.")
+    if geom_mun is not None:
+        c.drawImage(figura_sectores(geom_mun, df), MX, y - 205, width=250, height=205,
+                    preserveAspectRatio=True, anchor="nw")
+        xk = MX + 262
+        wk = (UTIL - 262 - 8) / 2
+        _kpi(c, xk, y - 46, wk, 44, str(r.get("n_sectores", 0)), "Sectores para seguimiento")
+        _kpi(c, xk + wk + 8, y - 46, wk, 44, str(r.get("n_prioritarios", 0)),
+             "Seguimiento prioritario", color=colors.HexColor(sec.COLOR_NIVEL[sec.NIVELES[0]]))
+        _kpi(c, xk, y - 98, wk, 44, f"{r.get('pct_area', 0):.1f} %".replace(".", ","),
+             "Del área municipal")
+        _kpi(c, xk + wk + 8, y - 98, wk, 44, str(r.get("n_con_cambio", 0)),
+             "Con cambio de cobertura o radar")
+        _parrafo(c, intro, xk, y - 112, UTIL - 262, tam=6.6, interlin=8.0)
+        y -= 228
+    else:
+        y = _parrafo(c, intro, MX, y, UTIL, tam=7, interlin=8.6) - 4
+    if df is None or df.empty:
+        y = _parrafo(c, "En esta semana ningún sector del municipio supera el umbral de "
+                        "seguimiento.", MX, y, UTIL, tam=8)
+    else:
+        n_tot = len(df)
+        df = df.head(28)
+        filas = [[str(i + 1),
+                  (s_["nivel"].replace("Seguimiento prioritario", "Prioritario"),
+                   sec.COLOR_NIVEL[s_["nivel"]]),
+                  f"{s_['lat']:.4f}, {s_['lon']:.4f}", s_["susceptibilidad"],
+                  f"{s_['lluvia_30d_mm']:.0f} / {s_['lluvia_max7d_mm']:.0f}",
+                  _c(s_["anomalia_lluvia"]),
+                  ("Sí" if s_["evidencia_cambio"] else "No")
+                  + ("" if s_["imagen_optica_valida_pct"] >= 50 else " (nubes)"),
+                  s_["exposicion"] or "—"]
+                 for i, s_ in df.iterrows()]
+        cab = ["N°", "Nivel", "Coordenadas (centro)", "Suscep.", "Lluvia 30 d / máx 7 d (mm)",
+               "Anomalía", "Cambio cobertura", "Expuestos"]
+        anchos = [20, 64, 86, 50, 92, 46, 62, UTIL - 420]
+        y = _tabla(c, MX, y, cab, filas, anchos, tam=6.4, alto_f=11.2)
+        if n_tot > len(df):
+            y = _parrafo(c, f"Se muestran los 28 sectores con mayor calificación de {n_tot}. "
+                            "La lista completa se descarga en Excel desde la aplicación "
+                            "(página «Sectores con cambios en la semana»).",
+                         MX, y - 4, UTIL, tam=6.8, color=GRIS)
+    y = _parrafo(c, "Reporte informativo de apoyo al seguimiento. No constituye una alerta: "
+                    "las alertas hidrometeorológicas las emite el IDEAM. Los sectores indican "
+                    "dónde verificar, no el predio afectado.", MX, y - 6, UTIL, tam=6.8,
+                 color=GRIS)
+    _pie(c)
+    c.showPage()
+    return pag + 1
 
 
 def generar_reporte(codigo: str, nombre: str, geom_mun: dict, otros: list[dict],
                     lluvia: dict | None = None, vegetacion: dict | None = None,
-                    cambio: dict | None = None) -> bytes:
+                    cambio: dict | None = None, sectores: dict | None = None) -> bytes:
     """«lluvia»: {serie, acum7, acum30, ref30, pct_ref}. «vegetacion»:
-    {perdida_ha, png (bytes) opcional}. «cambio»: {n_zonas, zonas: [...]}"""
+    {perdida_ha, png (bytes) opcional}. «cambio»: {n_zonas, zonas: [...]}.
+    «sectores»: {fecha, resumen, tabla (DataFrame de src.sectores.sectores)}"""
     m = sus.meta()
     res = sus.resumen_municipio(codigo)
     pts = sus.puntos(codigo)
@@ -393,7 +507,7 @@ def generar_reporte(codigo: str, nombre: str, geom_mun: dict, otros: list[dict],
                         "Riesgo de Desastres (CMGRD). Documento de apoyo al seguimiento.")
     y -= 12
     # Mensaje principal
-    msg = _mensaje(nombre, res, pts, lluvia, cambio)
+    msg = _mensaje(nombre, res, pts, lluvia, cambio, sectores)
     lineas = simpleSplit(msg, "Helvetica", 8.6, UTIL - 20)
     h = 14 + 10.6 * len(lineas)
     c.setFillColor(colors.HexColor("#fff8e1"))
@@ -568,6 +682,11 @@ def generar_reporte(codigo: str, nombre: str, geom_mun: dict, otros: list[dict],
     _pie(c)
     c.showPage()
 
+    # ======================= SECTORES DE LA SEMANA ==========================
+    pag = 3
+    if sectores is not None:
+        pag = _pagina_sectores(c, nombre, sectores, pag, geom_mun)
+
     # ======================= ANEXO (lista completa) =========================
     if len(pts) > len(top):
         filas = [[str(i + 1), r["vereda"] or "s/d", f"{r['lat']:.4f}, {r['lon']:.4f}",
@@ -577,7 +696,6 @@ def generar_reporte(codigo: str, nombre: str, geom_mun: dict, otros: list[dict],
                   r["fecha_ultima"].strftime("%d/%m/%Y"), r["tipo"] or "s/d"]
                  for i, r in pts.iterrows()]
         anchos = [20, 104, 78, 70, 50, 104, 48, UTIL - 474]
-        pag = 3
         while filas:
             y = _encabezado(c, nombre, pag)
             y -= 14
