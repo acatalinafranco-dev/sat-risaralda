@@ -469,7 +469,7 @@ def _pagina_sectores(c, nombre: str, sectores: dict, pag: int, geom_mun=None) ->
         if n_tot > len(df):
             y = _parrafo(c, f"Se muestran los 28 sectores con mayor calificación de {n_tot}. "
                             "La lista completa se descarga en Excel desde la aplicación "
-                            "(página «Sectores con cambios en la semana»).",
+                            "(sección «Movimientos en masa», pestaña «Sectores de la semana»).",
                          MX, y - 4, UTIL, tam=6.8, color=GRIS)
     y = _parrafo(c, "Reporte informativo de apoyo al seguimiento. No constituye una alerta: "
                     "las alertas hidrometeorológicas las emite el IDEAM. Los sectores indican "

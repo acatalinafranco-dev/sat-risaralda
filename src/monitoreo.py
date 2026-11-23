@@ -26,6 +26,9 @@ RUTA_CAMBIO = DIR_DATA / "modelo_cambio.json"
 
 
 def _geom(codigo: str) -> ee.Geometry:
+    if codigo == "66":  # todo el departamento
+        return ee.FeatureCollection([ee.Feature(ee.Geometry(f["geometry"]))
+                                     for f in geojson_municipios()["features"]]).geometry()
     for f in geojson_municipios()["features"]:
         if f["properties"]["codigo"] == codigo:
             return ee.Geometry(f["geometry"])
