@@ -15,7 +15,7 @@ from src import gee_estaciones as ge
 from src.ui import (VERDE_CARDER, agregar_municipios, conectar_gee, encabezado,
                     mapa_base, pie_institucional)
 
-st.set_page_config(page_title="Estaciones · SAT Risaralda", layout="wide",
+st.set_page_config(page_title="Estaciones · Monitoreo satelital Risaralda", layout="wide",
                    page_icon="📡", initial_sidebar_state="expanded")
 
 encabezado(

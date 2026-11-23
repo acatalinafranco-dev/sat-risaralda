@@ -17,7 +17,7 @@ from src.ui import (VERDE_CARDER, agregar_contorno, agregar_municipios,
                     ajustar_al_municipio, encabezado, mapa_base,
                     pie_institucional)
 
-st.set_page_config(page_title="NISAR · SAT Risaralda", layout="wide",
+st.set_page_config(page_title="NISAR · Monitoreo satelital Risaralda", layout="wide",
                    page_icon="🛰️", initial_sidebar_state="expanded")
 
 ASF = "https://api.daac.asf.alaska.edu/services/search/param"

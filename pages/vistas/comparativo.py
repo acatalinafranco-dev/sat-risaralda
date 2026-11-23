@@ -532,7 +532,7 @@ st.divider()
 st.markdown("#### Fuentes de datos")
 st.markdown(
     """
-| Fuente | Producto GEE | Resolución | Latencia aprox. | Uso en el SAT |
+| Fuente | Producto GEE | Resolución | Latencia aprox. | Uso en la aplicación |
 |---|---|---|---|---|
 | NASA GPM **IMERG V07** | `NASA/GPM_L3/IMERG_V07` | ~11 km / 30 min | 1–2 días | Lluvia casi en tiempo real |
 | UCSB **CHIRPS** | `UCSB-CHG/CHIRPS/DAILY` + `PENTAD` | ~5.5 km / diario | 2–3 semanas | Series y climatología 20 años |

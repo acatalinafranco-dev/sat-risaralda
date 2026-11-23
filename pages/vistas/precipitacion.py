@@ -29,7 +29,7 @@ def _limites(mapa) -> None:
     else:
         agregar_contorno(mapa)
 
-st.set_page_config(page_title="Precipitación · SAT Risaralda", layout="wide",
+st.set_page_config(page_title="Precipitación · Monitoreo satelital Risaralda", layout="wide",
                    page_icon="🌧️", initial_sidebar_state="expanded")
 
 encabezado(
@@ -317,8 +317,8 @@ estaciones en tierra, disponible desde 1981. La aplicación promedia los
             """
 1. **Evaluación de la lluvia reciente.** La aplicación compara la precipitación
    de los últimos 30 días (IMERG) con el promedio CHIRPS de los mismos días. El
-   resultado se presenta como **«% de la normal»** en la página de inicio, en el
-   comparativo municipal y en las fichas municipales. Un valor de 150 % indica
+   resultado se presenta como **«% de la normal»** en la página de inicio y en el
+   reporte semanal. Un valor de 150 % indica
    que la precipitación equivale a una vez y media la esperada para esa época.
 2. **Identificación de temporadas.** El gráfico mensual permite reconocer los
    meses de mayor y menor precipitación y orientar el seguimiento de laderas,

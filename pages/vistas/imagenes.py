@@ -21,7 +21,7 @@ from src import gibs
 from src.ui import (cache_mun, agregar_contorno, ajustar_al_municipio, conectar_gee,
                     encabezado, mapa_base, pie_institucional)
 
-st.set_page_config(page_title="Satelital · SAT Risaralda", layout="wide",
+st.set_page_config(page_title="Satelital · Monitoreo satelital Risaralda", layout="wide",
                    page_icon="🛰️", initial_sidebar_state="expanded")
 
 encabezado(

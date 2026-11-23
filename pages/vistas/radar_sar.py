@@ -17,7 +17,7 @@ from src.ui import (VERDE_CARDER, agregar_contorno, agregar_municipios,
                     ajustar_al_municipio, cache_mun, conectar_gee, encabezado,
                     leyenda_continua, mapa_base, pie_institucional)
 
-st.set_page_config(page_title="Radar SAR · SAT Risaralda", layout="wide",
+st.set_page_config(page_title="Radar SAR · Monitoreo satelital Risaralda", layout="wide",
                    page_icon="📡", initial_sidebar_state="expanded")
 
 encabezado(
