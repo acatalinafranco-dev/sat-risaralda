@@ -57,7 +57,11 @@ with st.spinner("Preparando el resumen de la semana (la primera consulta del dí
         errores.append(f"sectores: {exc}")
 
 pts = sus.puntos(COD)
-prio = pts[pts["nivel"] == sus.NIVELES[0]]
+try:  # sitios conocidos con cambio satelital real esta semana (máximo 20 por municipio)
+    prio = sec.sitios_semana(HOY.isoformat(), COD)
+except Exception as exc:  # noqa: BLE001
+    prio = pts.iloc[0:0]
+    errores.append(f"cambios en sitios conocidos: {exc}")
 a7 = (ll or {}).get("acum7")
 a30 = (ll or {}).get("acum30")
 pct = (ll or {}).get("pct_ref")
@@ -88,7 +92,10 @@ frase = (f"En **{nombre_activo()}** {razon}. "
             + (f"; **{_c(rs['n_prioritarios'])}** de ellos en seguimiento prioritario. "
                if rs["n_prioritarios"] else ". ") if rs else "")
          + (f"Aparte, de los **{_c(len(pts))} sitios** con movimientos en masa ya registrados, "
-            f"**{_c(len(prio))}** están en seguimiento prioritario." if len(prio) else ""))
+            f"**{_c(len(prio))}** muestran cambios en el terreno detectados por satélite esta semana."
+            if len(prio) else
+            f"De los **{_c(len(pts))} sitios** con movimientos en masa ya registrados, ninguno "
+            "muestra cambios en el terreno detectados por satélite esta semana."))
 st.markdown(
     f"""<div style="border-left:10px solid {color}; background:#fafafa; padding:14px 18px;
     border-radius:8px; margin-bottom:10px;">
@@ -133,9 +140,10 @@ _tarjeta(k[2], "🗺️", rs["n_sectores"] if rs else "s/d", "Sectores para segu
          (f"{rs['n_prioritarios']} prioritarios · {_c(rs['pct_area'], 1)} % del territorio · "
           f"{rs['n_con_cambio']} con cambio en la cobertura" if rs else ""),
          "#c0392b", (rs["pct_area"] * 5) if rs else None)
-_tarjeta(k[3], "📍", len(prio), "Sitios conocidos prioritarios",
-         f"De {len(pts)} sitios con movimiento confirmado; "
-         f"{int((prio['viviendas'] > 0).sum())} con viviendas expuestas.", "#8e44ad")
+_tarjeta(k[3], "📍", len(prio), "Sitios conocidos con cambio esta semana",
+         f"De {len(pts)} sitios registrados; se muestran como máximo 20 por municipio, solo "
+         f"donde el satélite detecta cambio. {int((prio['viviendas'] > 0).sum())} con viviendas.",
+         "#8e44ad")
 
 for e in errores:
     st.warning(f"No fue posible calcular {e}")
@@ -161,7 +169,7 @@ with cm:
     for _, r in prio.iterrows():
         folium.CircleMarker([r["lat"], r["lon"]], radius=3, color="white", weight=0.8,
                             fill=True, fill_color="#8e44ad", fill_opacity=1,
-                            tooltip=f"Sitio prioritario · {r['vereda'] or r['municipio']} · "
+                            tooltip=f"Sitio conocido con cambio · {r['vereda'] or r['municipio']} · "
                                     f"{sus.texto_exposicion(r) or 'sin expuestos registrados'}"
                             ).add_to(m)
     d = 0.00135
@@ -176,7 +184,7 @@ with cm:
         "<span style='color:#c0392b'>■</span> Sector de seguimiento prioritario &nbsp; "
         "<span style='color:#e67e22'>■</span> Sector de seguimiento &nbsp; "
         "<b>▢</b> borde grueso = cambio en la cobertura &nbsp; "
-        "<span style='color:#8e44ad'>●</span> Sitio conocido prioritario",
+        "<span style='color:#8e44ad'>●</span> Sitio conocido con cambio esta semana",
         unsafe_allow_html=True)
 
 with cd:
@@ -184,7 +192,7 @@ with cd:
     pasos = [
         ("1", "Revisar los sectores en rojo", "Empezar por los que tienen viviendas o vías "
          "cerca. En el detalle está el listado con coordenadas."),
-        ("2", "Verificar los sitios prioritarios", "De acuerdo con la información secundaria, en estos sitios "
+        ("2", "Verificar los sitios conocidos con cambio", "De acuerdo con la información secundaria, en estos sitios "
          "se presentan condiciones favorables que evidencian un posible movimiento en masa, por lo que se "
          "recomienda realizar una verificación del lugar."),
         ("3", "Registrar lo encontrado", "Realizar las acciones correspondientes."),
@@ -209,7 +217,7 @@ with cd:
             g = (df.groupby(["susceptibilidad", "nivel"]).size().unstack(fill_value=0)
                  .reindex(columns=sec.NIVELES, fill_value=0))
             g = g.reindex([c for c in sus.CLASES if c in g.index])
-            titulo_g = "Sectores según susceptibilidad"
+            titulo_g = "Sectores según propensión del terreno"
         fig = go.Figure()
         for n in sec.NIVELES[::-1]:
             fig.add_bar(y=g.index, x=g[n], orientation="h", name=n,
@@ -252,12 +260,12 @@ else:
 # --------------------------------------------------------------------------
 st.markdown("#### 🧩 Cómo se construye este resumen")
 cajas = [
-    ("⛰️", "Terreno", "Pendiente, relieve, geología y fallas del SGC, y la susceptibilidad "
-     "aprendida de las visitas de campo."),
+    ("⛰️", "Terreno", "Pendiente (clases IGAC), relieve, geología y fallas del SGC, y la "
+     "propensión del terreno según el modelo propio."),
     ("🌧️", "Lluvia", "Acumulado de 7 y 30 días y su diferencia con lo habitual, medido "
      "por satélite cada día."),
-    ("🛰️", "Cambios", "Pérdida de vegetación y suelo expuesto (Sentinel-2) y cambios en "
-     "radar (Sentinel-1)."),
+    ("🛰️", "Cambios", "Pérdida de vegetación y suelo expuesto (Sentinel-2) y cambios "
+     "persistentes en radar (Sentinel-1)."),
     ("📋", "Resultado", "Sectores de 300 m y sitios conocidos para verificar en campo, con "
      "elementos expuestos."),
 ]
