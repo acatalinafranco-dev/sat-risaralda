@@ -123,7 +123,7 @@ k4.metric("Eventos SIMMA en la zona", len(r["eventos"]))
 k5, k6, k7, k8 = st.columns(4)
 k5.metric("Lluvia 7 días", f"{_n(r.get('lluvia_7d'))} mm")
 k6.metric("Pendiente media", f"{_n(r.get('pendiente_media'))}°")
-k7.metric("Área con pendiente > 30°", f"{_n(r.get('pct_pend_30'))} %")
+k7.metric("Área escarpada (pendiente > 50 %, IGAC)", f"{_n(r.get('pct_pend_30'))} %")
 k8.metric("Cota", f"{_n(r.get('elev_min'))}–{_n(r.get('elev_max'))} m")
 
 st.markdown("#### Amenaza por movimientos en masa (SGC) dentro de la zona")
@@ -183,7 +183,7 @@ ind = pd.DataFrame([
     ("Referencia de 30 días (mm, promedio de 20 años)", r.get("normal_30d"), "CHIRPS"),
     ("Lluvia 30 d (% de la referencia)", r.get("pct_normal_30d"), "IMERG / CHIRPS"),
     ("Pendiente media (°)", r.get("pendiente_media"), "NASADEM, 30 m"),
-    ("Área con pendiente > 30° (%)", r.get("pct_pend_30"), "NASADEM, 30 m"),
+    ("Área escarpada, pendiente > 50 % según IGAC (%)", r.get("pct_pend_30"), "NASADEM, 30 m"),
     ("Cota mínima (m)", r.get("elev_min"), "NASADEM"),
     ("Cota máxima (m)", r.get("elev_max"), "NASADEM"),
     ("Eventos SIMMA en la zona", len(ev), f"SIMMA, descarga del {riesgo.fecha_corte_sgc()}"),

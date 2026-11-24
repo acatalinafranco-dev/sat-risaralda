@@ -208,7 +208,7 @@ else:
                   f"{fila.iloc[0]['alta_muy_alta']:.0f} %")
     try:
         ps = _pendiente_stats()
-        k4.metric("Área con pendiente > 30°", f"{ps['pct_mayor_30']:.0f} %",
+        k4.metric("Área escarpada (pendiente > 50 %, IGAC)", f"{ps['pct_mayor_30']:.0f} %",
                   f"pendiente media {ps['media']:.0f}°", delta_color="off")
     except Exception:  # noqa: BLE001
         pass
