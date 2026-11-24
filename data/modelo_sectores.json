@@ -1,5 +1,5 @@
 {
- "version": "1.0 (noviembre de 2026)",
+ "version": "1.1 (noviembre de 2026): pendiente según clases del IGAC",
  "modelo": "Random Forest (scikit-learn), 300 árboles, hoja mínima 3, salida de probabilidad",
  "n_arboles": 300,
  "min_hoja": 3,
@@ -8,7 +8,7 @@
   "terreno": [
    "Susceptibilidad del modelo propio",
    "Pendiente media",
-   "Fracción de ladera con pendiente > 25°",
+   "Fracción del sector con pendiente mayor de 50 % (clases escarpado y muy escarpado del IGAC)",
    "Relieve local",
    "Edad geológica (SGC 1:100.000)",
    "Distancia a fallas (SGC)"
@@ -27,32 +27,32 @@
  "entrenamiento": "19.462 sectores-mes de enero de 2024 a agosto de 2026: 262 sectores con movimiento en masa fechado (CDGRD y formulario posterior al sismo) y 600 sectores al azar por mes.",
  "validacion": {
   "metodo": "Validación cruzada por bloques espaciales de 5 km; evaluación mes a mes",
-  "auc": 0.921,
-  "auc_sin_sismo": 0.848,
-  "captura_top5": 65.6,
-  "captura_top5_sin_sismo": 44.8,
-  "captura_top10": 79.4,
-  "captura_top10_sin_sismo": 62.4,
+  "auc": 0.931,
+  "auc_sin_sismo": 0.866,
+  "captura_top5": 62.6,
+  "captura_top5_sin_sismo": 41.6,
+  "captura_top10": 79.0,
+  "captura_top10_sin_sismo": 60.0,
   "solo_terreno": {
    "auc_sin_sismo": 0.789,
    "captura_top10_sin_sismo": 52.0
   },
   "umbral_seguimiento": {
    "area_media_pct": 5.0,
-   "area_min_pct": 1.7,
-   "area_max_pct": 19.2,
-   "captura_pct": 76.0,
-   "captura_sin_sismo_pct": 52.0
+   "area_min_pct": 1.5,
+   "area_max_pct": 18.3,
+   "captura_pct": 74.8,
+   "captura_sin_sismo_pct": 49.6
   },
   "umbral_prioritario": {
    "area_media_pct": 2.0,
-   "captura_pct": 65.3,
-   "captura_sin_sismo_pct": 31.2
+   "captura_pct": 66.8,
+   "captura_sin_sismo_pct": 33.6
   },
   "aporte_cambio": "Las variables de cambio de cobertura y radar no mejoraron la calificación (1 a 2 puntos o menos); se reportan como evidencia complementaria."
  },
- "umbral_seguimiento": 0.0406,
- "umbral_prioritario": 0.0853,
+ "umbral_seguimiento": 0.0394,
+ "umbral_prioritario": 0.0865,
  "cortes_susc": [
   11,
   19,
@@ -65,5 +65,10 @@
   "La imagen óptica depende de las nubes; el reporte indica el porcentaje del sector con imagen válida.",
   "El modelo aprende de eventos visitados; zonas sin reporte histórico pueden estar subrepresentadas.",
   "Es un reporte informativo de apoyo al seguimiento. No constituye alerta: las alertas las emite el IDEAM."
- ]
+ ],
+ "pendiente": {
+  "criterio": "Clases de pendiente del IGAC (en porcentaje): 0-3 ligeramente plano; 3-7 ligeramente inclinado; 7-12 moderadamente inclinado; 12-25 fuertemente inclinado; 25-50 moderadamente escarpado; 50-75 escarpado; >75 muy escarpado.",
+  "variable": "Fracción del sector de 300 m con pendiente > 50 % (26,57°), calculada con NASADEM a 30 m.",
+  "fuente": "IGAC, clasificación de pendientes para levantamientos de suelos y cartografía geomorfológica."
+ }
 }
