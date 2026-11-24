@@ -32,6 +32,7 @@ NARANJA_UNGRD = VERDE_CARDER      # color de acento = verde CARDER
 AMARILLO_UNGRD = AMARILLO_CARDER
 
 RUTA_LOGO = Path(__file__).resolve().parent.parent / "logo" / "carder-logo.png"
+NOMBRE_APP = "Monitoreo satelital de movimientos en masa – Risaralda"
 DEPENDENCIA = "Subdirección para el Conocimiento y la Reducción del Riesgo - SCORE"
 ENTIDAD = "Corporación Autónoma Regional de Risaralda - CARDER"
 CONTACTO = "agalindo@carder.gov.co"
@@ -130,6 +131,8 @@ def branding_institucional() -> None:
 
     with st.sidebar:
         st.markdown(
+            f"<div style='font-size:1.02rem; font-weight:700; color:#1f4e3d; "
+            f"line-height:1.25; margin:2px 0 8px 0;'>{NOMBRE_APP}</div>"
             f"<div style='font-size:0.78rem; color:#3a3a3a; margin-top:4px; "
             f"line-height:1.35;'><b>{DEPENDENCIA}</b><br>"
             f"<span style='color:#666666;'>{ENTIDAD}</span></div>"
