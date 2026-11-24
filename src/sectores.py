@@ -514,7 +514,7 @@ except Exception:  # noqa: BLE001
 # Sitios conocidos con cambio satelital en la semana
 # --------------------------------------------------------------------------
 RADIO_SITIO_M = 100      # radio alrededor de cada sitio conocido
-UMBRAL_SITIO = 0.10      # fracción mínima del círculo con cambio
+UMBRAL_SITIO = 0.25      # fracción mínima del círculo con cambio (una cuarta parte)
 MAX_SITIOS = 20          # máximo de sitios destacados por municipio
 
 
@@ -565,7 +565,7 @@ except Exception:  # noqa: BLE001
 
 def sitios_semana(fecha: str, codigo: str | None = None, max_n: int = MAX_SITIOS) -> pd.DataFrame:
     """Sitios conocidos destacados en la semana: solo los que tienen cambio satelital
-    en al menos el 10 % del círculo de 100 m. Máximo «max_n» por municipio, ordenados
+    en al menos el 25 % del círculo de 100 m. Máximo «max_n» por municipio, ordenados
     por la magnitud del cambio y, en empate, por el índice de atención."""
     from src import susceptibilidad as sus
 

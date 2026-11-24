@@ -558,7 +558,7 @@ def generar_reporte(codigo: str, nombre: str, geom_mun: dict, otros: list[dict],
     y = _parrafo(c, "Propensión del terreno: modelo propio (CARDER, 2026), 30 m presentada a "
                     "60 m. Sitios: lugares con movimiento en masa registrado donde esta semana "
                     "el satélite detectó pérdida de vegetación o cambio persistente en radar en "
-                    "un radio de 100 m (máximo 20 por municipio). Los números corresponden a la "
+                    "al menos el 25 % del círculo de 100 m alrededor del sitio (máximo 20 por municipio). Los números corresponden a la "
                     "tabla.", MX, y, UTIL, tam=6.3, interlin=7.5, color=GRIS)
     y -= 6
     y = _titulo_seccion(c, "Sitios conocidos con cambio detectado esta semana", MX, y)
