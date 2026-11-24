@@ -275,7 +275,7 @@ def estadisticas_zona(geom_json: str, fecha: str) -> dict:
         dem = _dem()
         pend = ee.Terrain.slope(dem)
         v = ee.Image.cat([pend.rename("pend"),
-                          pend.gt(30).multiply(100).rename("p30")]
+                          pend.gt(26.565).multiply(100).rename("p30")]
                          ).reduceRegion(ee.Reducer.mean(), eeg, 30,
                                         maxPixels=1e9, tileScale=4).getInfo()
         mm = dem.reduceRegion(ee.Reducer.minMax(), eeg, 30, maxPixels=1e9,

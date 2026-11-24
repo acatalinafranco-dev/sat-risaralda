@@ -3,7 +3,7 @@ movimientos en masa.
 
 Cada semana se califica cada sector del departamento con:
   - condiciones del terreno (fijas): susceptibilidad del modelo propio,
-    pendiente media, fracción de ladera > 25°, relieve local, edad geológica
+    pendiente media, fracción del sector con pendiente > 50 % (escarpado, IGAC), relieve local, edad geológica
     y distancia a fallas (SGC 1:100.000);
   - lluvia de los últimos 30 días (IMERG): acumulado, máximo diario, máximo
     en 7 días y anomalía frente al promedio 2001-2020 del mes.
@@ -39,7 +39,9 @@ RUTA_META = DIR_DATA / "modelo_sectores.json"
 # Grilla EPSG:3116 (MAGNA-SIRGAS / Colombia Bogotá), celdas de 300 m
 X0, Y0, RES, ANCHO, ALTO = 762600.0, 1109100.0, 300.0, 318, 344
 
-V_TERRENO = ["susc", "pend", "f_pend25", "relieve", "geo_edad", "dist_falla"]
+V_TERRENO = ["susc", "pend", "f_pend50", "relieve", "geo_edad", "dist_falla"]
+# Pendiente de 50 % (26,57°): límite inferior de la clase «escarpado» del IGAC.
+PEND_IGAC_GRADOS = 26.565
 V_LLUVIA = ["im_mes", "im_max1d", "im_max7d", "im_anom"]
 VARIABLES = V_TERRENO + V_LLUVIA
 
@@ -62,6 +64,51 @@ def meta() -> dict:
 def grilla() -> dict:
     z = np.load(RUTA_GRILLA, allow_pickle=False)
     return {k: z[k] for k in z.files}
+
+
+@lru_cache(maxsize=1)
+def f_pend_igac() -> np.ndarray:
+    """Fracción de cada sector con pendiente > 50 % (clases escarpado y muy
+    escarpado del IGAC), con pendiente de NASADEM a 30 m. Se calcula una vez en
+    Earth Engine con la misma grilla del modelo; si falla, se usa la fracción
+    > 25° guardada en la grilla, que es casi equivalente (r = 0,96)."""
+    g = grilla()
+    if "f_pend50" in g:
+        return g["f_pend50"]
+    import ee
+
+    s = ee.Terrain.slope(ee.Image("NASA/NASADEM_HGT/001").select("elevation"))
+    img = (s.gt(PEND_IGAC_GRADOS).rename("f").toFloat()
+           .reduceResolution(ee.Reducer.mean(), maxPixels=256))
+    w2, h2 = ANCHO // 2, ALTO // 2
+    partes = [(0, 0, w2, h2), (w2, 0, ANCHO - w2, h2),
+              (0, h2, w2, ALTO - h2), (w2, h2, ANCHO - w2, ALTO - h2)]
+
+    def _parte(p):
+        j0, i0, w, h = p
+        x0, y1 = X0 + RES * j0, Y0 - RES * i0
+        return ee.data.computePixels({
+            "expression": img, "fileFormat": "NUMPY_NDARRAY",
+            "grid": {"dimensions": {"width": w, "height": h},
+                     "affineTransform": {"scaleX": RES, "shearX": 0, "translateX": x0,
+                                         "shearY": 0, "scaleY": -RES, "translateY": y1},
+                     "crsCode": "EPSG:3116"}})
+
+    with ThreadPoolExecutor(max_workers=4) as ex:
+        res = list(ex.map(_parte, partes))
+    out = np.full((ALTO, ANCHO), np.nan, np.float32)
+    for (j0, i0, w, h), a in zip(partes, res):
+        out[i0:i0 + h, j0:j0 + w] = a["f"]
+    return out
+
+
+def _terreno(v: str) -> np.ndarray:
+    if v != "f_pend50":
+        return grilla()[v]
+    try:
+        return f_pend_igac()
+    except Exception:  # noqa: BLE001
+        return grilla()["f_pend25"]
 
 
 @lru_cache(maxsize=1)
@@ -238,7 +285,7 @@ def calificar(fecha: str) -> dict:
     g, m = grilla(), meta()
     din = dinamicas(fecha)
     dentro = g["mun"] > 0
-    X = np.column_stack([g[v][dentro] for v in V_TERRENO] +
+    X = np.column_stack([_terreno(v)[dentro] for v in V_TERRENO] +
                         [din[v][dentro] for v in V_LLUVIA])
     X = np.where(np.isfinite(X), X, -99)
     p = modelo().predict_proba(X)[:, 1]

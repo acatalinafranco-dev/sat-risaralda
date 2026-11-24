@@ -41,13 +41,13 @@ def mapa_terreno(nombre: str) -> dict:
 
 
 def estadisticas_pendiente() -> dict:
-    """Pendiente media y % del área con pendiente > 30° en el municipio."""
+    """Pendiente media y % del área escarpada (pendiente > 50 %, clases IGAC) en el municipio."""
     dem = ee.Image("NASA/NASADEM_HGT/001").select("elevation")
     sl = ee.Terrain.slope(dem)
     g = roi()
     media = sl.reduceRegion(ee.Reducer.mean(), g, 90, maxPixels=1e9,
                             tileScale=4).get("slope")
-    fuerte = sl.gt(30).reduceRegion(ee.Reducer.mean(), g, 90, maxPixels=1e9,
+    fuerte = sl.gt(26.565).reduceRegion(ee.Reducer.mean(), g, 90, maxPixels=1e9,
                                     tileScale=4).get("slope")
     res = ee.Dictionary({"media": media, "fuerte": fuerte}).getInfo()
     return {"media": res.get("media"),
