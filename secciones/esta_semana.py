@@ -15,7 +15,13 @@ from src import susceptibilidad as sus
 from src.gee_session import (bounds_municipio, codigo_activo, es_departamento,
                              geojson_municipio, geojson_municipios, nombre_activo)
 from src.ui import (ESRI_IMAGERY_ATTR, ESRI_IMAGERY_URL, GRADIENTE, VERDE_CARDER,
-                    conectar_gee, encabezado, pie_institucional)
+                    NOMBRE_APP, conectar_gee, encabezado, pie_institucional)
+
+st.markdown(
+    f"<h1 style='color:{VERDE_CARDER}; font-size:2.1rem; line-height:1.2; "
+    f"margin:0 0 6px 0; padding:0;'>{NOMBRE_APP}</h1>",
+    unsafe_allow_html=True,
+)
 
 encabezado(
     "🗓️ Esta semana · {mun}",
