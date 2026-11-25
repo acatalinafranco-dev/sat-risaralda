@@ -168,7 +168,7 @@ with cm:
                    tiles=None, control_scale=True)
     folium.TileLayer(ESRI_IMAGERY_URL, attr=ESRI_IMAGERY_ATTR, name="Imagen satelital",
                      max_zoom=19).add_to(m)
-    folium.TileLayer("OpenStreetMap", name="Mapa de calles (OpenStreetMap)").add_to(m)
+    folium.TileLayer("OpenStreetMap", name="Mapa de calles (OpenStreetMap)", show=False).add_to(m)
     gj = geojson_municipios() if es_departamento() else geojson_municipio()
     folium.GeoJson(gj, name="Límites municipales", style_function=lambda f: {
         "color": "#ffffff", "weight": 1.5, "fill": False},
@@ -199,7 +199,7 @@ with cm:
     fg_sitios.add_to(m)
     for fg in capas.values():
         fg.add_to(m)
-    folium.LayerControl(collapsed=False, position="topright").add_to(m)
+    folium.LayerControl(collapsed=True, position="topright").add_to(m)
     # La clave cambia con el municipio: el mapa se vuelve a centrar al cambiar el filtro
     st_folium(m, height=470, use_container_width=True, returned_objects=[],
               key=f"mapa_semana_{COD}")
@@ -207,7 +207,9 @@ with cm:
         "<span style='color:#c0392b'>■</span> Sector de seguimiento prioritario &nbsp; "
         "<span style='color:#e67e22'>■</span> Sector de seguimiento &nbsp; "
         "<b>▢</b> borde grueso = cambio en la cobertura &nbsp; "
-        "<span style='color:#8e44ad'>●</span> Sitio conocido con cambio esta semana",
+        "<span style='color:#8e44ad'>●</span> Sitio conocido con cambio esta semana<br>"
+        "<span style='color:#666'>Para encender o apagar capas, use el ícono de capas en la esquina "
+        "superior derecha del mapa.</span>",
         unsafe_allow_html=True)
 
 with cd:
