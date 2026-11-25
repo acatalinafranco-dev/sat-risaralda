@@ -20,6 +20,7 @@ from src import susceptibilidad as sus
 from src.gee_session import (bounds_municipio, codigo_activo, es_departamento,
                              geojson_municipio, geojson_municipios, nombre_activo)
 from src.ui import (ESRI_IMAGERY_ATTR, ESRI_IMAGERY_URL, conectar_gee, encabezado,
+                    etiquetas_municipios,
                     pie_institucional)
 
 st.set_page_config(page_title="Propensión del terreno y sitios conocidos · Monitoreo satelital Risaralda",
@@ -164,8 +165,9 @@ for i, r in vis.iterrows():
         popup=folium.Popup(html, max_width=280),
         tooltip=f"{r['vereda'] or 's/d'} · {r['nivel']} · {r.get('momento') or ''}").add_to(fg)
 fg.add_to(m)
+etiquetas_municipios(m)
 folium.LayerControl(collapsed=True).add_to(m)
-st_folium(m, height=560, use_container_width=True, key="mapa_susc", returned_objects=[],
+st_folium(m, height=560, use_container_width=True, key=f"mapa_susc_{codigo}", returned_objects=[],
           center=[(la0 + la1) / 2, (lo0 + lo1) / 2], zoom=9 if es_departamento() else 11)
 
 ley = " ".join(

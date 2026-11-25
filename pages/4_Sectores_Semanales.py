@@ -17,6 +17,7 @@ from src import sectores as sec
 from src.gee_session import (bounds_municipio, codigo_activo, es_departamento,
                              geojson_municipio, geojson_municipios, nombre_activo)
 from src.ui import (ESRI_IMAGERY_ATTR, ESRI_IMAGERY_URL, conectar_gee, encabezado,
+                    etiquetas_municipios,
                     pie_institucional)
 
 st.set_page_config(page_title="Sectores semanales · Monitoreo satelital Risaralda", layout="wide",
@@ -160,8 +161,10 @@ for _, s in df.head(1500).iterrows():
                         tooltip=f"Punto de verificación · {s['pv_criterio']}").add_to(fp)
 fp.add_to(m)  # los puntos van debajo de los sectores
 fg.add_to(m)
+etiquetas_municipios(m)
 folium.LayerControl(collapsed=True).add_to(m)
-st_folium(m, height=560, use_container_width=True, returned_objects=[])
+st_folium(m, height=560, use_container_width=True, returned_objects=[],
+          key=f"mapa_sectores_{codigo}")
 _sym = ("display:inline-block;width:13px;height:13px;margin:0 6px 0 14px;"
         "vertical-align:-2px;")
 st.markdown(

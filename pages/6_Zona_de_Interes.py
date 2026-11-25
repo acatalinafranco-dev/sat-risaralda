@@ -19,6 +19,7 @@ from src import interactivo as itv
 from src import riesgo
 from src.gee_session import centro_activo, geojson_municipios
 from src.ui import (ESRI_IMAGERY_ATTR, ESRI_IMAGERY_URL, conectar_gee,
+                    etiquetas_municipios,
                     encabezado, pie_institucional)
 
 st.set_page_config(page_title="Zona de interés · Monitoreo satelital Risaralda", layout="wide",
@@ -57,6 +58,7 @@ Draw(
                   "rectangle": {"shapeOptions": sombra}},
     edit_options={"edit": True, "remove": True},
 ).add_to(m)
+etiquetas_municipios(m)
 folium.LayerControl(collapsed=True).add_to(m)
 
 salida = st_folium(m, height=560, use_container_width=True, key="mapa_zona",
