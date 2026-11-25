@@ -15,7 +15,8 @@ from src import susceptibilidad as sus
 from src.gee_session import (bounds_municipio, codigo_activo, es_departamento,
                              geojson_municipio, geojson_municipios, nombre_activo)
 from src.ui import (ESRI_IMAGERY_ATTR, ESRI_IMAGERY_URL, GRADIENTE, VERDE_CARDER,
-                    NOMBRE_APP, conectar_gee, encabezado, pie_institucional)
+                    NOMBRE_APP, conectar_gee, encabezado,
+                    etiquetas_municipios, pie_institucional)
 
 st.markdown(
     f"<h1 style='color:{VERDE_CARDER}; font-size:2.1rem; line-height:1.2; "
@@ -167,25 +168,41 @@ with cm:
                    tiles=None, control_scale=True)
     folium.TileLayer(ESRI_IMAGERY_URL, attr=ESRI_IMAGERY_ATTR, name="Imagen satelital",
                      max_zoom=19).add_to(m)
+    folium.TileLayer("OpenStreetMap", name="Mapa de calles (OpenStreetMap)").add_to(m)
     gj = geojson_municipios() if es_departamento() else geojson_municipio()
-    folium.GeoJson(gj, name="Municipios", style_function=lambda f: {
+    folium.GeoJson(gj, name="Límites municipales", style_function=lambda f: {
         "color": "#ffffff", "weight": 1.5, "fill": False},
         tooltip=folium.GeoJsonTooltip(["nombre"], labels=False) if es_departamento() else None).add_to(m)
+    etiquetas_municipios(m)
+    # Capas que se encienden y apagan desde el control del mapa (arriba a la derecha)
+    capas = {
+        "Seguimiento prioritario": folium.FeatureGroup(name="Sectores de seguimiento prioritario", show=True),
+        "Seguimiento": folium.FeatureGroup(name="Sectores de seguimiento", show=True),
+    }
+    fg_sitios = folium.FeatureGroup(name="Sitios conocidos con cambio esta semana", show=True)
     # Sitios conocidos primero, para que queden debajo de los sectores
     for _, r in prio.iterrows():
         folium.CircleMarker([r["lat"], r["lon"]], radius=3, color="white", weight=0.8,
                             fill=True, fill_color="#8e44ad", fill_opacity=1,
                             tooltip=f"Sitio conocido con cambio · {r['vereda'] or r['municipio']} · "
                                     f"{sus.texto_exposicion(r) or 'sin expuestos registrados'}"
-                            ).add_to(m)
+                            ).add_to(fg_sitios)
     d = 0.00135
     for _, s in df.head(900 if es_departamento() else 600).iterrows():
+        destino = capas["Seguimiento prioritario"] if "priorit" in str(s["nivel"]).lower() \
+            else capas["Seguimiento"]
         folium.Rectangle([[s["lat"] - d, s["lon"] - d], [s["lat"] + d, s["lon"] + d]],
                          color=sec.COLOR_NIVEL[s["nivel"]], weight=2 if s["evidencia_cambio"] else 0.5,
                          fill=True, fill_opacity=0.6,
                          tooltip=f"{s['nivel']} · {s['exposicion'] or 'sin expuestos identificados'}"
-                         ).add_to(m)
-    st_folium(m, height=470, use_container_width=True, returned_objects=[])
+                         ).add_to(destino)
+    fg_sitios.add_to(m)
+    for fg in capas.values():
+        fg.add_to(m)
+    folium.LayerControl(collapsed=False, position="topright").add_to(m)
+    # La clave cambia con el municipio: el mapa se vuelve a centrar al cambiar el filtro
+    st_folium(m, height=470, use_container_width=True, returned_objects=[],
+              key=f"mapa_semana_{COD}")
     st.markdown(
         "<span style='color:#c0392b'>■</span> Sector de seguimiento prioritario &nbsp; "
         "<span style='color:#e67e22'>■</span> Sector de seguimiento &nbsp; "
