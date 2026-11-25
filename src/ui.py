@@ -84,11 +84,21 @@ def selector_municipio() -> None:
     codigos = [c for c, _ in opciones]
     nombres = dict(opciones)
     actual = codigo_activo()
-    idx = codigos.index(actual) if actual in codigos else 0
+    if actual not in codigos:
+        actual = CODIGO_DEPTO
+    # El widget lleva clave propia y se siembra con la elección guardada: así
+    # el cambio de municipio se aplica en un solo clic, también al volver a
+    # «Todo Risaralda», y se conserva al pasar de una página a otra.
+    if st.session_state.get("_sel_mun") not in codigos:
+        st.session_state["_sel_mun"] = actual
+
+    def _guardar():
+        st.session_state["mun_codigo"] = st.session_state["_sel_mun"]
+
     with st.sidebar:
         sel = st.selectbox(
-            "Municipio de análisis", codigos, index=idx,
-            format_func=lambda c: nombres[c],
+            "Municipio de análisis", codigos, key="_sel_mun",
+            format_func=lambda c: nombres[c], on_change=_guardar,
             help="Todas las páginas se calculan sobre el polígono elegido.",
         )
     st.session_state["mun_codigo"] = sel
@@ -241,9 +251,42 @@ def mapa_base(zoom: int = 12, basemap: str = "Esri.WorldImagery") -> leafmap.Map
     return m
 
 
+@lru_cache(maxsize=1)
+def _puntos_etiqueta() -> tuple:
+    """(nombre, lat, lon) de un punto interior de cada municipio."""
+    from shapely.geometry import shape
+    out = []
+    for f in geojson_municipios()["features"]:
+        geo = shape(f["geometry"])
+        p = geo.representative_point()
+        out.append((f["properties"]["nombre"], p.y, p.x))
+    return tuple(out)
+
+
+def etiquetas_municipios(m) -> None:
+    """Nombre de los 14 municipios sobre el mapa, en una capa que se puede
+    encender y apagar («Nombres de municipios»). Idempotente."""
+    if getattr(m, "_etiquetas_agregadas", False):
+        return
+    m._etiquetas_agregadas = True
+    fg = folium.FeatureGroup(name="Nombres de municipios", show=True)
+    estilo = ("font: 600 12px/1.1 'Source Sans Pro', Arial, sans-serif; color:#ffffff; "
+              "white-space:nowrap; text-align:center; pointer-events:none; "
+              "transform:translate(-50%,-50%); text-shadow:0 0 3px #000, 0 0 3px #000, "
+              "0 0 2px #000;")
+    for nombre, lat, lon in _puntos_etiqueta():
+        folium.Marker(
+            [lat, lon], interactive=False,
+            icon=folium.DivIcon(html=f"<div style=\"{estilo}\">{nombre}</div>",
+                                icon_size=(0, 0), icon_anchor=(0, 0)),
+        ).add_to(fg)
+    fg.add_to(m)
+
+
 def agregar_contorno(m: leafmap.Map, nombre: str | None = None) -> None:
     """Límite de la unidad activa. Con «Todo Risaralda» se dibuja la división
-    municipal completa, de modo que todos los mapas la muestren."""
+    municipal completa, de modo que todos los mapas la muestren. Siempre
+    agrega los nombres de los municipios."""
     if es_departamento():
         agregar_municipios(m)
         return
@@ -254,6 +297,7 @@ def agregar_contorno(m: leafmap.Map, nombre: str | None = None) -> None:
             "color": "#ffff00", "weight": 2.5, "fill": False,
         },
     ).add_to(m)
+    etiquetas_municipios(m)
 
 
 def agregar_municipios(m: leafmap.Map) -> None:
@@ -279,6 +323,7 @@ def agregar_municipios(m: leafmap.Map) -> None:
         tooltip=folium.GeoJsonTooltip(
             fields=["nombre", "area_km2"], aliases=["Municipio", "Área (km²)"]),
     ).add_to(m)
+    etiquetas_municipios(m)
 
 
 URL_AMENAZA_SGC = (
